@@ -176,6 +176,14 @@ py r2_probe.py                                  # raw read-only R2 status log
 
 ---
 
+## Other treadmills, watches & contributing
+
+TreadPod was built for my own setup (**KingSmith R2 `KS-SC-BLR2C` + COROS PACE 4 on Windows 11**). The Bluetooth RSC (`0x1814`) foot-pod output is standard and may work with other watches that accept BLE foot pods, while other WalkingPad/KingSmith revisions or FTMS treadmills may need small protocol adjustments.
+
+Feel free to fork and adapt it for your own setup, or open an [Issue](https://github.com/mikhalov/TreadPod/issues) or Pull Request for your treadmill, watch, or use case (a quick BLE service dump or `r2_probe.py` output is always helpful).
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

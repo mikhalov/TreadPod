@@ -35,23 +35,23 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
         var adapter = await BluetoothAdapter.GetDefaultAsync();
         if (adapter is null)
         {
-            return new RscStartResult(RscStartStatus.BluetoothOff, "Bluetooth-адаптер не знайдено");
+            return new RscStartResult(RscStartStatus.BluetoothOff, "Bluetooth adapter not found");
         }
 
         if (!adapter.IsPeripheralRoleSupported)
         {
-            return new RscStartResult(RscStartStatus.Failed, "Bluetooth-адаптер не підтримує роль периферійного датчика");
+            return new RscStartResult(RscStartStatus.Failed, "Bluetooth adapter does not support BLE peripheral role");
         }
 
         var result = await GattServiceProvider.CreateAsync(RscProtocol.ServiceUuid);
         if (result.Error == BluetoothError.RadioNotAvailable)
         {
-            return new RscStartResult(RscStartStatus.BluetoothOff, "Bluetooth на ПК вимкнено (RADIO_NOT_AVAILABLE)");
+            return new RscStartResult(RscStartStatus.BluetoothOff, "Bluetooth is turned off (RADIO_NOT_AVAILABLE)");
         }
 
         if (result.ServiceProvider is null || result.Error != BluetoothError.Success)
         {
-            return new RscStartResult(RscStartStatus.Failed, $"GATT-сервер не створено: {result.Error}");
+            return new RscStartResult(RscStartStatus.Failed, $"Failed to create GATT server: {result.Error}");
         }
 
         var provider = result.ServiceProvider;
@@ -64,7 +64,7 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
         var measRes = await provider.Service.CreateCharacteristicAsync(RscProtocol.MeasurementUuid, measParams);
         if (measRes.Error != BluetoothError.Success || measRes.Characteristic is null)
         {
-            return new RscStartResult(RscStartStatus.Failed, $"Не вдалося створити характеристику 0x2A53: {measRes.Error}");
+            return new RscStartResult(RscStartStatus.Failed, $"Failed to create characteristic 0x2A53: {measRes.Error}");
         }
 
         var featParams = new GattLocalCharacteristicParameters
@@ -76,7 +76,7 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
         var featRes = await provider.Service.CreateCharacteristicAsync(RscProtocol.FeatureUuid, featParams);
         if (featRes.Error != BluetoothError.Success)
         {
-            return new RscStartResult(RscStartStatus.Failed, $"Не вдалося створити характеристику 0x2A54: {featRes.Error}");
+            return new RscStartResult(RscStartStatus.Failed, $"Failed to create characteristic 0x2A54: {featRes.Error}");
         }
 
         var adv = new GattServiceProviderAdvertisingParameters
@@ -124,7 +124,7 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
             or GattServiceProviderAdvertisementStatus.Stopped)
         {
             await DisposeAsync().ConfigureAwait(false);
-            return new RscStartResult(RscStartStatus.Failed, $"Реклама BLE зупинена: {advStatus}");
+            return new RscStartResult(RscStartStatus.Failed, $"BLE advertising stopped: {advStatus}");
         }
 
         return new RscStartResult(RscStartStatus.Started, $"status={advStatus}");
@@ -219,12 +219,12 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
             var clients = sender.SubscribedClients;
             if (clients.Count == 0)
             {
-                DiagnosticMessage?.Invoke("Підписників на 0x2A53: 0 (клієнт відписався)");
+                DiagnosticMessage?.Invoke("Subscribers on 0x2A53: 0 (client unsubscribed)");
                 return;
             }
 
             var ids = string.Join(", ", clients.Select(c => c.Session?.DeviceId?.Id ?? "?"));
-            DiagnosticMessage?.Invoke($"Підписників на 0x2A53: {clients.Count} ({ids})");
+            DiagnosticMessage?.Invoke($"Subscribers on 0x2A53: {clients.Count} ({ids})");
         }
         catch (Exception ex)
         {

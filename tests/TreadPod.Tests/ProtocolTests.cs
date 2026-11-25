@@ -53,12 +53,16 @@ public sealed class ProtocolTests
     [Theory]
     [InlineData(0.0, "—")]
     [InlineData(2.4, "—")]
-    [InlineData(2.5, "24:00 /км")]
-    [InlineData(7.5, "8:00 /км")]
-    [InlineData(10.0, "6:00 /км")]
+    [InlineData(2.5, "24:00 /km")]
+    [InlineData(7.5, "8:00 /km")]
+    [InlineData(10.0, "6:00 /km")]
     public void RscFormatPace_RespectsPace4Threshold(double speedKmh, string expected)
     {
         Assert.Equal(expected, RscProtocol.FormatPace(speedKmh));
+        if (speedKmh >= 2.5)
+        {
+            Assert.Equal(expected.Replace("/km", "/км"), RscProtocol.FormatPace(speedKmh, "/км"));
+        }
     }
 
     [Fact]

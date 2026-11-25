@@ -112,21 +112,21 @@
           <Button x:Name="PinButton"
                   Classes="icon-btn"
                   Command="{Binding TogglePinCommand}"
-                  ToolTip.Tip="Закріпити поверх вікон">
+                  ToolTip.Tip="{Binding Text.PinTooltip}">
             <PathIcon Width="14" Height="14"
                       Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
           </Button>
           <Button x:Name="MenuButton"
                   Classes="icon-btn"
                   Command="{Binding ToggleMenuCommand}"
-                  ToolTip.Tip="Параметри">
+                  ToolTip.Tip="{Binding Text.MenuTooltip}">
             <PathIcon Width="14" Height="14"
                       Data="M6,10A2,2 0 0,0 4,12A2,2 0 0,0 6,14A2,2 0 0,0 8,12A2,2 0 0,0 6,10M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10M18,10A2,2 0 0,0 16,12A2,2 0 0,0 18,14A2,2 0 0,0 20,12A2,2 0 0,0 18,10Z" />
           </Button>
           <Button x:Name="HideButton"
                   Classes="icon-btn"
                   Command="{Binding HideWindowCommand}"
-                  ToolTip.Tip="Згорнути в трей">
+                  ToolTip.Tip="{Binding Text.HideTooltip}">
             <PathIcon Width="14" Height="14"
                       Data="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" />
           </Button>
@@ -152,19 +152,19 @@
                       Grid.Column="0"
                       Classes="seg-btn"
                       Classes.active="{Binding IsStatusTab}"
-                      Content="Стан"
+                      Content="{Binding Text.TabStatus}"
                       Command="{Binding SelectStatusTabCommand}" />
               <Button x:Name="TabHistoryButton"
                       Grid.Column="1"
                       Classes="seg-btn"
                       Classes.active="{Binding IsHistoryTab}"
-                      Content="Історія"
+                      Content="{Binding Text.TabHistory}"
                       Command="{Binding SelectHistoryTabCommand}" />
               <Button x:Name="TabLogButton"
                       Grid.Column="2"
                       Classes="seg-btn"
                       Classes.active="{Binding IsLogTab}"
-                      Content="Лог"
+                      Content="{Binding Text.TabLog}"
                       Command="{Binding SelectLogTabCommand}" />
             </Grid>
           </Border>
@@ -247,14 +247,14 @@
               <Grid RowDefinitions="Auto,*,Auto">
                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                   <StackPanel Grid.Column="0" Spacing="2">
-                    <TextBlock Text="Темп зараз" FontSize="12" Foreground="#A1A1AA" />
+                    <TextBlock Text="{Binding Text.CurrentPaceLabel}" FontSize="12" Foreground="#A1A1AA" />
                     <TextBlock x:Name="PaceReadoutText"
                                Text="{Binding PaceText}"
                                FontSize="30"
                                FontWeight="Bold"
                                Foreground="#FFFFFF" />
                     <TextBlock IsVisible="{Binding ShowLowSpeedPaceNote}"
-                               Text="на годиннику від 2.5 км/год"
+                               Text="{Binding Text.LowSpeedPaceNote}"
                                FontSize="12"
                                Foreground="#FBBF24" />
                   </StackPanel>
@@ -284,15 +284,15 @@
                   <Border Height="1" Background="#1AFFFFFF" />
                   <Grid ColumnDefinitions="*,*,*">
                     <StackPanel Grid.Column="0" HorizontalAlignment="Center" Spacing="2">
-                      <TextBlock Text="Каденс" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
+                      <TextBlock Text="{Binding Text.CadenceLabel}" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
                       <TextBlock Text="{Binding CadenceText}" FontSize="13" FontWeight="SemiBold" Foreground="#F4F4F5" HorizontalAlignment="Center" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" HorizontalAlignment="Center" Spacing="2">
-                      <TextBlock Text="Кроки" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
+                      <TextBlock Text="{Binding Text.StepsLabel}" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
                       <TextBlock Text="{Binding StepsText}" FontSize="13" FontWeight="SemiBold" Foreground="#F4F4F5" HorizontalAlignment="Center" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" HorizontalAlignment="Center" Spacing="2">
-                      <TextBlock Text="Час / Дис." FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
+                      <TextBlock Text="{Binding Text.TimeDistanceLabel}" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
                       <TextBlock Text="{Binding TimeDistanceText}" FontSize="13" FontWeight="SemiBold" Foreground="#F4F4F5" HorizontalAlignment="Center" />
                     </StackPanel>
                   </Grid>
@@ -337,7 +337,7 @@
                     BorderThickness="1"
                     CornerRadius="12"
                     Padding="18">
-              <TextBlock Text="Тут зʼявляться завершені пробіжки (час, дистанція R2 та причина відключення)."
+              <TextBlock Text="{Binding Text.HistoryEmpty}"
                          FontSize="12"
                          Foreground="#A1A1AA"
                          TextWrapping="Wrap"
@@ -389,7 +389,7 @@
                   Padding="12">
             <Grid>
               <TextBlock IsVisible="{Binding HasNoLogs}"
-                         Text="Подій протоколу ще немає."
+                         Text="{Binding Text.LogEmpty}"
                          FontSize="12"
                          Foreground="#A1A1AA"
                          HorizontalAlignment="Center"
@@ -432,7 +432,7 @@
             <StackPanel Spacing="10">
               <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Grid.Column="0"
-                           Text="Автозапуск з Windows"
+                           Text="{Binding Text.AutostartLabel}"
                            FontSize="12"
                            Foreground="#E4E4E7"
                            VerticalAlignment="Center" />
@@ -449,6 +449,37 @@
                 </Button>
               </Grid>
 
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Text.LanguageLabel}"
+                           FontSize="12"
+                           Foreground="#E4E4E7"
+                           VerticalAlignment="Center" />
+                <Border Grid.Column="1"
+                        Background="#0AFFFFFF"
+                        BorderBrush="#1AFFFFFF"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="2">
+                  <Grid ColumnDefinitions="*,*" ColumnSpacing="2">
+                    <Button x:Name="LangEnButton"
+                            Grid.Column="0"
+                            Classes="seg-btn"
+                            Classes.active="{Binding IsEnglish}"
+                            Padding="8,3"
+                            Content="EN"
+                            Command="{Binding SetEnglishCommand}" />
+                    <Button x:Name="LangUkButton"
+                            Grid.Column="1"
+                            Classes="seg-btn"
+                            Classes.active="{Binding IsUkrainian}"
+                            Padding="8,3"
+                            Content="UK"
+                            Command="{Binding SetUkrainianCommand}" />
+                  </Grid>
+                </Border>
+              </Grid>
+
               <Border Height="1" Background="#1AFFFFFF" />
 
               <Button x:Name="ExitTriggerButton"
@@ -456,7 +487,7 @@
                       Command="{Binding RequestExitCommand}"
                       HorizontalAlignment="Stretch"
                       HorizontalContentAlignment="Left">
-                <TextBlock Text="Вийти з TreadPod" FontSize="12" FontWeight="SemiBold" Foreground="#FB7185" />
+                <TextBlock Text="{Binding Text.ExitMenuLabel}" FontSize="12" FontWeight="SemiBold" Foreground="#FB7185" />
               </Button>
 
               <Border x:Name="ExitConfirmBox"
@@ -467,13 +498,13 @@
                       CornerRadius="10"
                       Padding="10">
                 <StackPanel Spacing="8">
-                  <TextBlock Text="Перезапуск змінить BLE-адресу датчика — годинник доведеться додавати заново. Точно вийти?"
+                  <TextBlock Text="{Binding Text.ExitConfirmMessage}"
                              FontSize="12"
                              TextWrapping="Wrap"
                              Foreground="#FECDD3" />
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
-                    <Button x:Name="ExitCancelButton" Classes="subtle-btn" Content="Ні" Command="{Binding CancelExitCommand}" />
-                    <Button x:Name="ExitConfirmButton" Classes="danger-solid-btn" Content="Вийти" Command="{Binding ConfirmExitCommand}" />
+                    <Button x:Name="ExitCancelButton" Classes="subtle-btn" Content="{Binding Text.ExitCancelLabel}" Command="{Binding CancelExitCommand}" />
+                    <Button x:Name="ExitConfirmButton" Classes="danger-solid-btn" Content="{Binding Text.ExitConfirmLabel}" Command="{Binding ConfirmExitCommand}" />
                   </StackPanel>
                 </StackPanel>
               </Border>

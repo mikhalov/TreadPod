@@ -4,6 +4,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
+using TreadPod.App.Localization;
 using TreadPod.App.ViewModels;
 using TreadPod.App.Views;
 using TreadPod.Core.Bridge;
@@ -23,7 +24,7 @@ public sealed class MainWindowHeadlessTests
     {
         Directory.CreateDirectory(ScreenshotDir);
 
-        var vm = new MainViewModel();
+        var vm = new MainViewModel(initialLanguage: AppLanguage.En);
         var exitFired = false;
         vm.ExitRequested += () => exitFired = true;
 
@@ -39,7 +40,7 @@ public sealed class MainWindowHeadlessTests
             Phase: BridgePhase.WaitingForWatch,
             WatchConnected: false,
             R2Name: null,
-            R2StatusText: "Вільна",
+            R2StatusText: "Idle",
             SpeedKmh: 0,
             CadenceSpm: 0,
             RscCadence: 0,
@@ -69,7 +70,7 @@ public sealed class MainWindowHeadlessTests
                 Phase: BridgePhase.Running,
                 WatchConnected: true,
                 R2Name: "KS-SC-BLR2C",
-                R2StatusText: "Передає дані",
+                R2StatusText: "Streaming",
                 SpeedKmh: 7.5,
                 CadenceSpm: 162,
                 RscCadence: 81,
@@ -82,16 +83,16 @@ public sealed class MainWindowHeadlessTests
                 UpdatedAt: DateTimeOffset.Now),
             seedSpeedHistory: [6.4, 6.8, 7.0, 7.2, 7.2, 7.5, 7.5, 7.4, 7.5, 7.6, 7.5, 7.5]);
         FlushUi();
-        Assert.Equal("8:00 /км", window.FindControl<TextBlock>("PaceReadoutText")!.Text);
+        Assert.Equal("8:00 /km", window.FindControl<TextBlock>("PaceReadoutText")!.Text);
         Assert.Equal(430, window.Bounds.Height);
         SaveFrame(window, "02_running.png");
 
         // 3. Populate history & click History tab
         vm.SetSessions(
         [
-            new RunSessionRecord(DateTimeOffset.Now.AddHours(-2), DateTimeOffset.Now.AddMinutes(-78), 2520, 5.86, 6140, 8.4, "годинник зберіг"),
-            new RunSessionRecord(DateTimeOffset.Now.AddDays(-2), DateTimeOffset.Now.AddDays(-2).AddMinutes(31), 1860, 4.20, 4390, 8.1, "простій 3 хв"),
-            new RunSessionRecord(DateTimeOffset.Now.AddDays(-4), DateTimeOffset.Now.AddDays(-4).AddMinutes(50), 3000, 7.10, 7420, 8.5, "годинник зберіг")
+            new RunSessionRecord(DateTimeOffset.Now.AddHours(-2), DateTimeOffset.Now.AddMinutes(-78), 2520, 5.86, 6140, 8.4, "watch saved"),
+            new RunSessionRecord(DateTimeOffset.Now.AddDays(-2), DateTimeOffset.Now.AddDays(-2).AddMinutes(31), 1860, 4.20, 4390, 8.1, "3 min idle"),
+            new RunSessionRecord(DateTimeOffset.Now.AddDays(-4), DateTimeOffset.Now.AddDays(-4).AddMinutes(50), 3000, 7.10, 7420, 8.5, "watch saved")
         ]);
         vm.SetLogs(
         [
@@ -138,6 +139,17 @@ public sealed class MainWindowHeadlessTests
         Assert.False(exitConfirmBox.IsVisible);
         Assert.False(exitFired);
 
+        // Toggle language to Ukrainian and back to English inside open menu
+        ClickControl(window, window.FindControl<Button>("LangUkButton")!);
+        Assert.True(vm.IsUkrainian);
+        Assert.Equal("8:00 /км", window.FindControl<TextBlock>("PaceReadoutText")!.Text);
+        Assert.Equal("Історія", window.FindControl<Button>("TabHistoryButton")!.Content);
+
+        ClickControl(window, window.FindControl<Button>("LangEnButton")!);
+        Assert.True(vm.IsEnglish);
+        Assert.Equal("8:00 /km", window.FindControl<TextBlock>("PaceReadoutText")!.Text);
+        Assert.Equal("History", window.FindControl<Button>("TabHistoryButton")!.Content);
+
         // Click bottom area of dimmed backdrop -> closes overlay menu
         var backdrop = window.FindControl<Control>("MenuBackdrop")!;
         var backdropPt = backdrop.TranslatePoint(new Point(backdrop.Bounds.Width / 2.0, backdrop.Bounds.Height - 24.0), window);
@@ -176,5 +188,17 @@ public sealed class MainWindowHeadlessTests
         Assert.NotNull(frame);
         var fullPath = Path.Combine(ScreenshotDir, fileName);
         frame!.Save(fullPath);
+    }
+
+    [Fact]
+    public void UiStrings_LocalizesBothEnglishAndLegacyUkrainianReleaseReasons()
+    {
+        Assert.Equal("watch saved", UiStrings.En.LocalizeReleaseReason("watch saved"));
+        Assert.Equal("watch saved", UiStrings.En.LocalizeReleaseReason("годинник зберіг"));
+        Assert.Equal("3 min idle", UiStrings.En.LocalizeReleaseReason("простій 3 хв"));
+
+        Assert.Equal("годинник зберіг", UiStrings.Uk.LocalizeReleaseReason("watch saved"));
+        Assert.Equal("простій 3 хв", UiStrings.Uk.LocalizeReleaseReason("3 min idle"));
+        Assert.Equal("R2 відключилась", UiStrings.Uk.LocalizeReleaseReason("R2 disconnected"));
     }
 }

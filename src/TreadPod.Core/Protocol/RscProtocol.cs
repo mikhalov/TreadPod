@@ -34,7 +34,7 @@ public static class RscProtocol
         ];
     }
 
-    public static string FormatPace(double speedKmh)
+    public static string FormatPace(double speedKmh, string paceUnit = "/km")
     {
         if (speedKmh < 2.5)
         {
@@ -44,7 +44,7 @@ public static class RscProtocol
         var secPerKm = (int)Math.Round(3600.0 / speedKmh, MidpointRounding.AwayFromZero);
         var min = secPerKm / 60;
         var sec = secPerKm % 60;
-        return string.Create(CultureInfo.InvariantCulture, $"{min}:{sec:00} /км");
+        return string.Create(CultureInfo.InvariantCulture, $"{min}:{sec:00} {paceUnit}");
     }
 
     public static string FormatHex(ReadOnlySpan<byte> bytes)

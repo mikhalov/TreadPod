@@ -5,6 +5,8 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Avalonia;
 using Avalonia.Media;
+using TreadPod.App.Localization;
+using TreadPod.App.Platform;
 using TreadPod.Core.Bridge;
 using TreadPod.Core.Protocol;
 
@@ -60,7 +62,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private static readonly IBrush ToggleOffBg = new SolidColorBrush(Color.Parse("#475569"));
 
     private readonly IAutostartService? _autostart;
+    private readonly IAppSettingsStore? _settingsStore;
     private readonly List<double> _speedHistory = [];
+
+    private AppLanguage _language;
+    private BridgeSnapshot? _lastSnapshot;
+    private IReadOnlyList<RunSessionRecord> _lastSessions = [];
 
     private BridgePhase _currentPhase = BridgePhase.WaitingForWatch;
     private string _selectedTab = "status";
@@ -72,24 +79,31 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool _needsWatchRepairHint = true;
     private string? _errorMessage;
 
-    private string _r2ShortStatus = "вільна";
-    private string _watchShortStatus = "очікує";
-    private string _pipeLabel = "готовий";
+    private string _r2ShortStatus = string.Empty;
+    private string _watchShortStatus = string.Empty;
+    private string _pipeLabel = string.Empty;
     private string _paceText = "—";
-    private string _speedText = "0.0 км/год";
-    private string _cadenceText = "0 кр/хв";
+    private string _speedText = string.Empty;
+    private string _cadenceText = string.Empty;
     private string _stepsText = "0";
     private string _timeDistanceText = "00:00 · 0.00";
-    private string _idleTitle = "Міст активний у фоні";
-    private string _idleDescription = "Почни Indoor Run на COROS — далі все підхопиться автоматично.";
+    private string _idleTitle = string.Empty;
+    private string _idleDescription = string.Empty;
     private bool _showLowSpeedPaceNote;
     private IList<Point> _sparklinePoints = [];
     private IList<Point> _sparklineFillPoints = [];
 
-    public MainViewModel(IAutostartService? autostart = null)
+    public MainViewModel(
+        IAutostartService? autostart = null,
+        IAppSettingsStore? settingsStore = null,
+        AppLanguage? initialLanguage = null)
     {
         _autostart = autostart;
+        _settingsStore = settingsStore;
+        _language = initialLanguage ?? settingsStore?.LoadLanguage() ?? AppLanguage.En;
         _isAutostartEnabled = autostart?.IsEnabled() ?? false;
+
+        ApplyDefaultIdleStrings();
 
         SelectStatusTabCommand = new RelayCommand(() => SelectedTab = "status");
         SelectHistoryTabCommand = new RelayCommand(() => SelectedTab = "history");
@@ -109,6 +123,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             IsExitConfirmOpen = false;
         });
         ToggleAutostartCommand = new RelayCommand(ToggleAutostart);
+        SetEnglishCommand = new RelayCommand(() => SetLanguage(AppLanguage.En));
+        SetUkrainianCommand = new RelayCommand(() => SetLanguage(AppLanguage.Uk));
         DismissToastCommand = new RelayCommand(() =>
         {
             _hintDismissed = true;
@@ -129,6 +145,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public event Action? HideRequested;
     public event Action? ExitRequested;
     public event Action<BridgePhase>? StatusVisualChanged;
+    public event Action<AppLanguage>? LanguageChanged;
 
     public ICommand SelectStatusTabCommand { get; }
     public ICommand SelectHistoryTabCommand { get; }
@@ -137,11 +154,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand ToggleMenuCommand { get; }
     public ICommand CloseMenuCommand { get; }
     public ICommand ToggleAutostartCommand { get; }
+    public ICommand SetEnglishCommand { get; }
+    public ICommand SetUkrainianCommand { get; }
     public ICommand DismissToastCommand { get; }
     public ICommand RequestExitCommand { get; }
     public ICommand CancelExitCommand { get; }
     public ICommand ConfirmExitCommand { get; }
     public ICommand HideWindowCommand { get; }
+
+    public AppLanguage Language => _language;
+    public UiStrings Text => UiStrings.For(_language);
+    public bool IsEnglish => _language == AppLanguage.En;
+    public bool IsUkrainian => _language == AppLanguage.Uk;
 
     public ObservableCollection<SessionItemViewModel> Sessions { get; } = [];
     public ObservableCollection<string> LogEntries { get; } = [];
@@ -209,8 +233,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string ToastText => _currentPhase switch
     {
-        BridgePhase.BluetoothOff or BridgePhase.Error => _errorMessage ?? "Bluetooth на ПК вимкнено (RADIO_NOT_AVAILABLE)",
-        _ => "Нова адреса — додай датчик на годиннику заново"
+        BridgePhase.BluetoothOff or BridgePhase.Error => _errorMessage ?? Text.ToastBtOffFallback,
+        _ => Text.ToastRepairHint
     };
 
     public IBrush ToastBackgroundBrush => CanDismissToast ? ToastInfoBg : ToastErrBg;
@@ -309,8 +333,52 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public bool HasLogs => LogEntries.Count > 0;
     public bool HasNoLogs => LogEntries.Count == 0;
 
-    public void ApplySnapshot(BridgeSnapshot snapshot, IReadOnlyList<double>? seedSpeedHistory = null)
+    public void ApplySnapshot(BridgeSnapshot snapshot, IReadOnlyList<double>? seedSpeedHistory = null) =>
+        RenderSnapshot(snapshot, seedSpeedHistory, recordHistory: true);
+
+    public void SetLanguage(AppLanguage language)
     {
+        if (_language == language)
+        {
+            return;
+        }
+
+        _language = language;
+        _settingsStore?.SaveLanguage(language);
+
+        OnPropertyChanged(nameof(Language));
+        OnPropertyChanged(nameof(Text));
+        OnPropertyChanged(nameof(IsEnglish));
+        OnPropertyChanged(nameof(IsUkrainian));
+
+        if (_lastSnapshot is not null)
+        {
+            RenderSnapshot(_lastSnapshot, seedSpeedHistory: null, recordHistory: false);
+        }
+        else
+        {
+            ApplyDefaultIdleStrings();
+        }
+
+        SetSessions(_lastSessions);
+        NotifyToastProperties();
+        LanguageChanged?.Invoke(language);
+    }
+
+    private void ApplyDefaultIdleStrings()
+    {
+        WatchShortStatus = Text.WatchWaiting;
+        R2ShortStatus = Text.R2Idle;
+        PipeLabel = Text.PipeWaiting;
+        IdleTitle = Text.IdleWaitingTitle;
+        IdleDescription = Text.IdleWaitingDescription;
+        SpeedText = string.Create(CultureInfo.InvariantCulture, $"0.0 {Text.SpeedUnit}");
+        CadenceText = $"0 {Text.CadenceUnit}";
+    }
+
+    private void RenderSnapshot(BridgeSnapshot snapshot, IReadOnlyList<double>? seedSpeedHistory, bool recordHistory)
+    {
+        _lastSnapshot = snapshot;
         var previousPhase = _currentPhase;
         var previousHint = _needsWatchRepairHint;
 
@@ -326,88 +394,79 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         WatchShortStatus = snapshot.Phase switch
         {
-            BridgePhase.BluetoothOff or BridgePhase.Error => "помилка",
-            _ => snapshot.WatchConnected ? "підключено" : "очікує"
+            BridgePhase.BluetoothOff or BridgePhase.Error => Text.WatchError,
+            _ => snapshot.WatchConnected ? Text.WatchConnected : Text.WatchWaiting
         };
 
         R2ShortStatus = snapshot.Phase switch
         {
-            BridgePhase.ScanningR2 => "пошук…",
-            BridgePhase.ConnectedIdle => snapshot.SpeedKmh == 0 && snapshot.Steps > 0 ? "пауза" : "підключено",
-            BridgePhase.Running => "біг (1)",
-            BridgePhase.ReleasedForKsFit => "відпущено",
-            BridgePhase.BluetoothOff => "вимкнено",
-            BridgePhase.Error => "помилка",
-            _ => "вільна"
+            BridgePhase.ScanningR2 => Text.R2Scanning,
+            BridgePhase.ConnectedIdle => snapshot.SpeedKmh == 0 && snapshot.Steps > 0 ? Text.R2Paused : Text.R2Connected,
+            BridgePhase.Running => Text.R2Running,
+            BridgePhase.ReleasedForKsFit => Text.R2Released,
+            BridgePhase.BluetoothOff => Text.R2BtOff,
+            BridgePhase.Error => Text.R2Error,
+            _ => Text.R2Idle
         };
 
         PipeLabel = snapshot.Phase switch
         {
-            BridgePhase.ScanningR2 => "пошук",
-            BridgePhase.ConnectedIdle => "готові",
-            BridgePhase.Running => "1 Гц",
-            BridgePhase.ReleasedForKsFit => "KS Fit",
-            BridgePhase.BluetoothOff => "BT OFF",
-            BridgePhase.Error => "помилка",
-            _ => "готовий"
+            BridgePhase.ScanningR2 => Text.PipeScanning,
+            BridgePhase.ConnectedIdle => Text.PipeReady,
+            BridgePhase.Running => Text.PipeLive,
+            BridgePhase.ReleasedForKsFit => Text.PipeKsFit,
+            BridgePhase.BluetoothOff => Text.PipeBtOff,
+            BridgePhase.Error => Text.PipeError,
+            _ => Text.PipeWaiting
         };
 
         (IdleTitle, IdleDescription) = snapshot.Phase switch
         {
-            BridgePhase.ScanningR2 => (
-                "Годинник готовий — шукаю R2",
-                "Увімкни доріжку KingSmith R2 (KS Fit на телефоні має бути закритий)."),
-            BridgePhase.ConnectedIdle => (
-                "Доріжку підключено",
-                "Полотно зараз стоїть. Коли почнеш біг, темп піде на COROS щосекунди."),
-            BridgePhase.ReleasedForKsFit => (
-                "Доріжку відпущено для KS Fit",
-                "Можеш забрати сесію в KS Fit. Наступне тренування на годиннику стартує автоматично."),
-            BridgePhase.BluetoothOff => (
-                "Bluetooth на ПК вимкнено",
-                snapshot.ErrorMessage ?? "Увімкни Bluetooth у Windows, щоб міст відновив роботу."),
-            BridgePhase.Error => (
-                "Помилка Bluetooth-адаптера",
-                snapshot.ErrorMessage ?? "Перевір Bluetooth-адаптер у Диспетчері пристроїв."),
-            _ => (
-                "Міст активний у фоні",
-                "Почни Indoor Run на COROS — далі все підхопиться автоматично.")
+            BridgePhase.ScanningR2 => (Text.IdleScanningTitle, Text.IdleScanningDescription),
+            BridgePhase.ConnectedIdle => (Text.IdleConnectedTitle, Text.IdleConnectedDescription),
+            BridgePhase.ReleasedForKsFit => (Text.IdleReleasedTitle, Text.IdleReleasedDescription),
+            BridgePhase.BluetoothOff => (Text.IdleBtOffTitle, snapshot.ErrorMessage ?? Text.IdleBtOffDescription),
+            BridgePhase.Error => (Text.IdleErrorTitle, snapshot.ErrorMessage ?? Text.IdleErrorDescription),
+            _ => (Text.IdleWaitingTitle, Text.IdleWaitingDescription)
         };
 
         PaceText = snapshot.Phase == BridgePhase.Running
-            ? RscProtocol.FormatPace(snapshot.SpeedKmh)
+            ? RscProtocol.FormatPace(snapshot.SpeedKmh, Text.PaceUnit)
             : "—";
         ShowLowSpeedPaceNote = snapshot.Phase == BridgePhase.Running && snapshot.SpeedKmh < 2.5;
-        SpeedText = string.Create(CultureInfo.InvariantCulture, $"{snapshot.SpeedKmh:0.0} км/год");
-        CadenceText = $"{snapshot.CadenceSpm} кр/хв";
+        SpeedText = string.Create(CultureInfo.InvariantCulture, $"{snapshot.SpeedKmh:0.0} {Text.SpeedUnit}");
+        CadenceText = $"{snapshot.CadenceSpm} {Text.CadenceUnit}";
         StepsText = FormatThousands(snapshot.Steps);
 
         var mm = snapshot.BeltTimeSeconds / 60;
         var ss = snapshot.BeltTimeSeconds % 60;
         TimeDistanceText = string.Create(CultureInfo.InvariantCulture, $"{mm:00}:{ss:00} · {snapshot.BeltDistanceKm:0.00}");
 
-        if (seedSpeedHistory is { Count: > 0 })
+        if (recordHistory)
         {
-            _speedHistory.Clear();
-            foreach (var v in seedSpeedHistory.TakeLast(MaxSparkPoints))
+            if (seedSpeedHistory is { Count: > 0 })
             {
-                _speedHistory.Add(v);
+                _speedHistory.Clear();
+                foreach (var v in seedSpeedHistory.TakeLast(MaxSparkPoints))
+                {
+                    _speedHistory.Add(v);
+                }
             }
-        }
-        else if (snapshot.Phase == BridgePhase.Running)
-        {
-            _speedHistory.Add(snapshot.SpeedKmh);
-            if (_speedHistory.Count > MaxSparkPoints)
+            else if (snapshot.Phase == BridgePhase.Running)
             {
-                _speedHistory.RemoveAt(0);
+                _speedHistory.Add(snapshot.SpeedKmh);
+                if (_speedHistory.Count > MaxSparkPoints)
+                {
+                    _speedHistory.RemoveAt(0);
+                }
             }
-        }
-        else if (snapshot.Phase is BridgePhase.WaitingForWatch or BridgePhase.ReleasedForKsFit)
-        {
-            _speedHistory.Clear();
-        }
+            else if (snapshot.Phase is BridgePhase.WaitingForWatch or BridgePhase.ReleasedForKsFit)
+            {
+                _speedHistory.Clear();
+            }
 
-        RebuildSparkline();
+            RebuildSparkline();
+        }
 
         if (previousPhase != _currentPhase)
         {
@@ -422,19 +481,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void SetSessions(IReadOnlyList<RunSessionRecord> records)
     {
+        _lastSessions = records.ToArray();
         Sessions.Clear();
-        var culture = CultureInfo.GetCultureInfo("uk-UA");
-        foreach (var r in records)
+        var culture = CultureInfo.GetCultureInfo(Text.DateCultureName);
+        foreach (var r in _lastSessions)
         {
             var localStart = r.StartedAt.ToLocalTime();
             var datePart = localStart.Date == DateTime.Today
-                ? "Сьогодні"
+                ? Text.TodayLabel
                 : localStart.ToString("d MMM", culture);
             var title = $"{datePart} · {localStart:HH:mm}";
             var mins = Math.Max(1, (int)Math.Round(r.DurationSeconds / 60.0));
-            var subtitle = $"{mins} хв · {r.ReleaseReason}";
-            var distance = string.Create(CultureInfo.InvariantCulture, $"{r.DistanceKm:0.00} км");
-            var pace = RscProtocol.FormatPace(r.AvgSpeedKmh);
+            var reason = Text.LocalizeReleaseReason(r.ReleaseReason);
+            var subtitle = $"{mins} {Text.MinUnit} · {reason}";
+            var distance = string.Create(CultureInfo.InvariantCulture, $"{r.DistanceKm:0.00} {Text.DistanceUnit}");
+            var pace = RscProtocol.FormatPace(r.AvgSpeedKmh, Text.PaceUnit);
             Sessions.Add(new SessionItemViewModel(title, subtitle, distance, pace));
         }
 

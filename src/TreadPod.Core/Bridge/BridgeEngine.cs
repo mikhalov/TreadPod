@@ -27,7 +27,7 @@ public sealed class BridgeEngine : IAsyncDisposable
     private IR2Client? _r2Client;
     private Task<IR2Client?>? _scanTask;
     private CancellationTokenSource? _scanCts;
-    private string _r2StatusText = "Вільна";
+    private string _r2StatusText = "Idle";
     private string? _r2Name;
     private string? _errorMessage;
 
@@ -90,16 +90,16 @@ public sealed class BridgeEngine : IAsyncDisposable
                 _errorMessage = null;
                 _needsWatchRepairHint = true;
                 _phase = BridgePhase.WaitingForWatch;
-                _r2StatusText = "Вільна";
+                _r2StatusText = "Idle";
                 var detailsSuffix = string.IsNullOrWhiteSpace(result.Details) ? string.Empty : $" ({result.Details})";
-                AppendLogLocked($"RSC 0x1814 рекламується{detailsSuffix}; очікую годинник COROS");
+                AppendLogLocked($"RSC 0x1814 advertising{detailsSuffix}; waiting for COROS watch");
             }
             else if (result.Status == RscStartStatus.BluetoothOff)
             {
                 _rscStarted = false;
                 _phase = BridgePhase.BluetoothOff;
-                _r2StatusText = "BT вимкнено";
-                _errorMessage = result.Details ?? "Bluetooth на ПК вимкнено (RADIO_NOT_AVAILABLE)";
+                _r2StatusText = "BT off";
+                _errorMessage = result.Details ?? "Bluetooth is turned off (RADIO_NOT_AVAILABLE)";
                 _lastBluetoothRetry = _timeProvider.GetUtcNow();
                 AppendLogLocked($"ERROR: {_errorMessage}");
             }
@@ -107,8 +107,8 @@ public sealed class BridgeEngine : IAsyncDisposable
             {
                 _rscStarted = false;
                 _phase = BridgePhase.Error;
-                _r2StatusText = "Помилка";
-                _errorMessage = result.Details ?? "Не вдалося запустити Bluetooth-датчик";
+                _r2StatusText = "Error";
+                _errorMessage = result.Details ?? "Failed to start Bluetooth foot pod";
                 AppendLogLocked($"ERROR: {_errorMessage}");
             }
         }
@@ -118,7 +118,7 @@ public sealed class BridgeEngine : IAsyncDisposable
 
     public async Task NotifySystemResumeAsync(CancellationToken cancellationToken = default)
     {
-        await ReleaseR2Async("сон ПК", markSessionBlocked: false, cancellationToken).ConfigureAwait(false);
+        await ReleaseR2Async("PC sleep", markSessionBlocked: false, cancellationToken).ConfigureAwait(false);
 
         var result = _rscStarted
             ? await _rscServer.RestartAdvertisingAsync(cancellationToken).ConfigureAwait(false)
@@ -139,24 +139,24 @@ public sealed class BridgeEngine : IAsyncDisposable
                 _rscStarted = true;
                 _errorMessage = null;
                 _phase = BridgePhase.WaitingForWatch;
-                _r2StatusText = "Вільна";
+                _r2StatusText = "Idle";
                 AppendLogLocked(preserved
-                    ? "ПК вийшов зі сну — реклама збереглась без зміни адреси"
-                    : "ПК вийшов зі сну — реклама датчика перезапущена");
+                    ? "System resumed — BLE advertising preserved (same address)"
+                    : "System resumed — BLE advertising restarted");
             }
             else if (result.Status == RscStartStatus.BluetoothOff)
             {
                 _rscStarted = false;
                 _phase = BridgePhase.BluetoothOff;
-                _r2StatusText = "BT вимкнено";
-                _errorMessage = result.Details ?? "Bluetooth на ПК вимкнено (RADIO_NOT_AVAILABLE)";
+                _r2StatusText = "BT off";
+                _errorMessage = result.Details ?? "Bluetooth is turned off (RADIO_NOT_AVAILABLE)";
                 AppendLogLocked($"ERROR: {_errorMessage}");
             }
             else
             {
                 _rscStarted = false;
                 _phase = BridgePhase.Error;
-                _errorMessage = result.Details ?? "Помилка перезапуску реклами після сну";
+                _errorMessage = result.Details ?? "Failed to restart BLE advertising after sleep";
                 AppendLogLocked($"ERROR: {_errorMessage}");
             }
         }
@@ -208,7 +208,7 @@ public sealed class BridgeEngine : IAsyncDisposable
                 if (_needsWatchRepairHint)
                 {
                     _needsWatchRepairHint = false;
-                    AppendLogLocked("COROS підключився — підказку прибрано");
+                    AppendLogLocked("COROS connected — repair hint dismissed");
                 }
             }
 
@@ -224,7 +224,7 @@ public sealed class BridgeEngine : IAsyncDisposable
                 else if (_phase != BridgePhase.ReleasedForKsFit)
                 {
                     _phase = BridgePhase.WaitingForWatch;
-                    _r2StatusText = "Вільна";
+                    _r2StatusText = "Idle";
                 }
             }
             else if (_scanTask is { IsCompleted: true })
@@ -244,14 +244,14 @@ public sealed class BridgeEngine : IAsyncDisposable
             CancelOngoingScan();
             if (activeClient != null)
             {
-                await ReleaseR2Async("годинник зберіг", markSessionBlocked: false, cancellationToken).ConfigureAwait(false);
+                await ReleaseR2Async("watch saved", markSessionBlocked: false, cancellationToken).ConfigureAwait(false);
             }
             else
             {
                 lock (_sync)
                 {
                     _phase = BridgePhase.WaitingForWatch;
-                    _r2StatusText = "Вільна";
+                    _r2StatusText = "Idle";
                 }
             }
         }
@@ -313,8 +313,8 @@ public sealed class BridgeEngine : IAsyncDisposable
             _scanCts?.Dispose();
             _scanCts = CancellationTokenSource.CreateLinkedTokenSource(outerToken);
             _phase = BridgePhase.ScanningR2;
-            _r2StatusText = "Пошук KS-*…";
-            AppendLogLocked("Годинник активний — сканую KingSmith R2…");
+            _r2StatusText = "Scanning KS-*...";
+            AppendLogLocked("Watch active — scanning for KingSmith R2...");
             var token = _scanCts.Token;
             _scanTask = _r2Factory.ScanAndConnectAsync(token);
         }
@@ -370,8 +370,8 @@ public sealed class BridgeEngine : IAsyncDisposable
         {
             lock (_sync)
             {
-                AppendLogLocked($"Помилка пошуку R2: {ex.Message}");
-                _r2StatusText = "Не знайдено (повтор…)";
+                AppendLogLocked($"R2 scan error: {ex.Message}");
+                _r2StatusText = "Not found (retrying...)";
             }
             return;
         }
@@ -380,8 +380,8 @@ public sealed class BridgeEngine : IAsyncDisposable
         {
             lock (_sync)
             {
-                _r2StatusText = "Не знайдено (KS Fit чи вимкнена?)";
-                AppendLogLocked("R2 не знайдено — спробую знову");
+                _r2StatusText = "Not found (KS Fit or powered off?)";
+                AppendLogLocked("R2 not found — will retry");
             }
             return;
         }
@@ -399,7 +399,7 @@ public sealed class BridgeEngine : IAsyncDisposable
             {
                 _r2Client = client;
                 _r2Name = client.DeviceName;
-                _r2StatusText = $"Підключено ({client.DeviceName})";
+                _r2StatusText = $"Connected ({client.DeviceName})";
                 _phase = BridgePhase.ConnectedIdle;
                 _cadence.Reset();
                 _ranInCurrentConnection = false;
@@ -414,7 +414,7 @@ public sealed class BridgeEngine : IAsyncDisposable
                 _beltState = null;
                 client.PacketReceived += OnR2PacketReceived;
                 client.Disconnected += OnR2Disconnected;
-                AppendLogLocked($"Підключено до {client.DeviceName} (лише читання FE00)");
+                AppendLogLocked($"Connected to {client.DeviceName} (read-only FE00)");
             }
         }
 
@@ -440,7 +440,7 @@ public sealed class BridgeEngine : IAsyncDisposable
 
         if (!client.IsConnected)
         {
-            await ReleaseR2Async("R2 відключилась", markSessionBlocked: false, cancellationToken).ConfigureAwait(false);
+            await ReleaseR2Async("R2 disconnected", markSessionBlocked: false, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -454,7 +454,7 @@ public sealed class BridgeEngine : IAsyncDisposable
             {
                 AppendLogLocked($"R2 poll failed: {ex.Message}");
             }
-            await ReleaseR2Async("R2 відключилась", markSessionBlocked: false, cancellationToken).ConfigureAwait(false);
+            await ReleaseR2Async("R2 disconnected", markSessionBlocked: false, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -467,13 +467,13 @@ public sealed class BridgeEngine : IAsyncDisposable
                 _runStartedAt ??= now;
                 _idleSince = null;
                 _phase = BridgePhase.Running;
-                _r2StatusText = "Передає дані";
+                _r2StatusText = "Streaming";
             }
             else if (_ranInCurrentConnection)
             {
                 _idleSince ??= now;
                 _phase = BridgePhase.ConnectedIdle;
-                _r2StatusText = "Пауза полотна";
+                _r2StatusText = "Belt paused";
                 if (now - _idleSince.Value > BeltIdleReleasePeriod)
                 {
                     shouldReleaseForIdle = true;
@@ -483,7 +483,7 @@ public sealed class BridgeEngine : IAsyncDisposable
 
         if (shouldReleaseForIdle)
         {
-            await ReleaseR2Async("простій 3 хв", markSessionBlocked: true, cancellationToken).ConfigureAwait(false);
+            await ReleaseR2Async("3 min idle", markSessionBlocked: true, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -527,12 +527,12 @@ public sealed class BridgeEngine : IAsyncDisposable
                 _runStartedAt ??= now;
                 _idleSince = null;
                 _phase = BridgePhase.Running;
-                _r2StatusText = "Передає дані";
+                _r2StatusText = "Streaming";
             }
             else if (_r2Client != null)
             {
                 _phase = BridgePhase.ConnectedIdle;
-                _r2StatusText = _ranInCurrentConnection ? "Пауза полотна" : $"Підключено ({_r2Name})";
+                _r2StatusText = _ranInCurrentConnection ? "Belt paused" : $"Connected ({_r2Name})";
             }
         }
     }
@@ -541,7 +541,7 @@ public sealed class BridgeEngine : IAsyncDisposable
     {
         lock (_sync)
         {
-            AppendLogLocked("Зʼєднання з R2 перервано");
+            AppendLogLocked("R2 connection dropped");
         }
     }
 
@@ -589,17 +589,17 @@ public sealed class BridgeEngine : IAsyncDisposable
             if (markSessionBlocked)
             {
                 _phase = BridgePhase.ReleasedForKsFit;
-                _r2StatusText = "Відпущено · KS Fit вільний";
+                _r2StatusText = "Released · KS Fit free";
             }
             else
             {
                 _phase = _rscStarted ? BridgePhase.WaitingForWatch : _phase;
-                _r2StatusText = reason == "годинник зберіг" ? "Відпущено · KS Fit вільний" : "Вільна";
+                _r2StatusText = reason == "watch saved" ? "Released · KS Fit free" : "Idle";
             }
 
             if (client != null)
             {
-                AppendLogLocked($"Доріжку відпущено ({reason})");
+                AppendLogLocked($"Treadmill released ({reason})");
             }
         }
 
@@ -629,7 +629,7 @@ public sealed class BridgeEngine : IAsyncDisposable
             {
                 lock (_sync)
                 {
-                    AppendLogLocked($"Не вдалося зберегти сесію: {ex.Message}");
+                    AppendLogLocked($"Failed to save session: {ex.Message}");
                 }
             }
         }
@@ -685,7 +685,7 @@ public sealed class BridgeEngine : IAsyncDisposable
     {
         _rscServer.DiagnosticMessage -= OnRscDiagnostic;
         CancelOngoingScan();
-        await ReleaseR2Async("вихід", markSessionBlocked: false, CancellationToken.None).ConfigureAwait(false);
+        await ReleaseR2Async("exit", markSessionBlocked: false, CancellationToken.None).ConfigureAwait(false);
         await _rscServer.DisposeAsync().ConfigureAwait(false);
     }
 }

@@ -183,7 +183,7 @@ public sealed class BridgeEngineTests
 
         Assert.True(r2.Disposed);
         Assert.Single(store.Items);
-        Assert.Equal("годинник зберіг", store.Items[0].ReleaseReason);
+        Assert.Equal("watch saved", store.Items[0].ReleaseReason);
         Assert.Equal(1.33, store.Items[0].DistanceKm, 2);
     }
 
@@ -215,7 +215,7 @@ public sealed class BridgeEngineTests
         Assert.True(r2.Disposed);
         Assert.Equal(BridgePhase.ReleasedForKsFit, engine.CurrentSnapshot.Phase);
         Assert.Single(store.Items);
-        Assert.Equal("простій 3 хв", store.Items[0].ReleaseReason);
+        Assert.Equal("3 min idle", store.Items[0].ReleaseReason);
 
         // Must NOT reconnect during the same watch session
         clock.Advance(TimeSpan.FromSeconds(5));
@@ -286,7 +286,7 @@ public sealed class BridgeEngineTests
         var clock = new ManualTimeProvider();
         var rsc = new FakeRscServer
         {
-            NextStartResult = new RscStartResult(RscStartStatus.BluetoothOff, "Bluetooth на ПК вимкнено")
+            NextStartResult = new RscStartResult(RscStartStatus.BluetoothOff, "Bluetooth is turned off")
         };
         var factory = new FakeR2Factory(() => new FakeR2Client());
         var store = new InMemorySessionStore();
@@ -319,11 +319,11 @@ public sealed class BridgeEngineTests
         await using var engine = new BridgeEngine(rsc, factory, store, clock);
         await engine.StartAsync();
 
-        rsc.EmitDiagnostic("Підписників на 0x2A53: 1 (COROS)");
+        rsc.EmitDiagnostic("Subscribers on 0x2A53: 1 (COROS)");
         var logs = engine.GetRecentLogs();
 
         Assert.Contains(logs, l => l.Contains("status=Started"));
-        Assert.Contains(logs, l => l.Contains("Підписників на 0x2A53: 1 (COROS)"));
+        Assert.Contains(logs, l => l.Contains("Subscribers on 0x2A53: 1 (COROS)"));
     }
 
     [Fact]
@@ -347,6 +347,6 @@ public sealed class BridgeEngineTests
 
         Assert.Equal(1, rsc.RestartCount);
         Assert.False(engine.CurrentSnapshot.NeedsWatchRepairHint);
-        Assert.Contains(engine.GetRecentLogs(), l => l.Contains("без зміни адреси"));
+        Assert.Contains(engine.GetRecentLogs(), l => l.Contains("same address"));
     }
 }

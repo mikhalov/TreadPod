@@ -1,0 +1,487 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:TreadPod.App.ViewModels"
+        x:Class="TreadPod.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="TreadPod"
+        Width="348"
+        Height="430"
+        SystemDecorations="None"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="{Binding IsPinned, Mode=OneWay}"
+        TransparencyLevelHint="AcrylicBlur,Blur,None"
+        Background="Transparent">
+
+  <Window.Styles>
+    <Style Selector="Button.icon-btn">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="6" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Foreground" Value="#D4D4D8" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.icon-btn:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#1AFFFFFF" />
+    </Style>
+
+    <Style Selector="Button.seg-btn">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="8,5" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Foreground" Value="#A1A1AA" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.seg-btn:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#0DFFFFFF" />
+      <Setter Property="Foreground" Value="#F4F4F5" />
+    </Style>
+    <Style Selector="Button.seg-btn.active">
+      <Setter Property="Background" Value="#26FFFFFF" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+    </Style>
+
+    <Style Selector="Button.subtle-btn">
+      <Setter Property="Background" Value="#14FFFFFF" />
+      <Setter Property="BorderBrush" Value="#22FFFFFF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Foreground" Value="#E4E4E7" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.danger-solid-btn">
+      <Setter Property="Background" Value="#E11D48" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="Foreground" Value="#FFFFFF" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.menu-danger-btn">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.menu-danger-btn:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="#1FF43F5E" />
+    </Style>
+  </Window.Styles>
+
+  <Border CornerRadius="16"
+          Background="#F2101216"
+          BorderBrush="#24FFFFFF"
+          BorderThickness="1"
+          ClipToBounds="True">
+    <Grid RowDefinitions="Auto,*">
+
+      <!-- Minimal Top Strip (draggable) -->
+      <Grid Grid.Row="0"
+            x:Name="HeaderStrip"
+            ColumnDefinitions="*,Auto"
+            Margin="16,13,12,8"
+            Background="Transparent">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Ellipse Width="8" Height="8" Fill="{Binding StatusDotBrush}" VerticalAlignment="Center" />
+          <TextBlock Text="TREADPOD"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     LetterSpacing="0.8"
+                     Foreground="#E4E4E7"
+                     VerticalAlignment="Center" />
+          <Border IsVisible="{Binding IsPinned}"
+                  Background="#2410B981"
+                  CornerRadius="10"
+                  Padding="7,2">
+            <TextBlock Text="Pin" FontSize="11" FontWeight="Medium" Foreground="#34D399" />
+          </Border>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+          <Button x:Name="PinButton"
+                  Classes="icon-btn"
+                  Command="{Binding TogglePinCommand}"
+                  ToolTip.Tip="Закріпити поверх вікон">
+            <PathIcon Width="14" Height="14"
+                      Data="M16,12V4H17V2H7V4H8V12L6,14V16H11.2V22H12.8V16H18V14L16,12Z" />
+          </Button>
+          <Button x:Name="MenuButton"
+                  Classes="icon-btn"
+                  Command="{Binding ToggleMenuCommand}"
+                  ToolTip.Tip="Параметри">
+            <PathIcon Width="14" Height="14"
+                      Data="M6,10A2,2 0 0,0 4,12A2,2 0 0,0 6,14A2,2 0 0,0 8,12A2,2 0 0,0 6,10M12,10A2,2 0 0,0 10,12A2,2 0 0,0 12,14A2,2 0 0,0 14,12A2,2 0 0,0 12,10M18,10A2,2 0 0,0 16,12A2,2 0 0,0 18,14A2,2 0 0,0 20,12A2,2 0 0,0 18,10Z" />
+          </Button>
+          <Button x:Name="HideButton"
+                  Classes="icon-btn"
+                  Command="{Binding HideWindowCommand}"
+                  ToolTip.Tip="Згорнути в трей">
+            <PathIcon Width="14" Height="14"
+                      Data="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z" />
+          </Button>
+        </StackPanel>
+      </Grid>
+
+      <!-- Main Body + Overlay Container -->
+      <Grid Grid.Row="1">
+
+        <!-- Layer 1: Main Tabbed Content (Fixed Card Height) -->
+        <Grid RowDefinitions="Auto,*" Margin="16,0,16,16">
+
+          <!-- Segmented Switcher -->
+          <Border Grid.Row="0"
+                  Margin="0,0,0,12"
+                  Background="#0AFFFFFF"
+                  BorderBrush="#1AFFFFFF"
+                  BorderThickness="1"
+                  CornerRadius="11"
+                  Padding="4">
+            <Grid ColumnDefinitions="*,*,*" ColumnSpacing="4">
+              <Button x:Name="TabStatusButton"
+                      Grid.Column="0"
+                      Classes="seg-btn"
+                      Classes.active="{Binding IsStatusTab}"
+                      Content="Стан"
+                      Command="{Binding SelectStatusTabCommand}" />
+              <Button x:Name="TabHistoryButton"
+                      Grid.Column="1"
+                      Classes="seg-btn"
+                      Classes.active="{Binding IsHistoryTab}"
+                      Content="Історія"
+                      Command="{Binding SelectHistoryTabCommand}" />
+              <Button x:Name="TabLogButton"
+                      Grid.Column="2"
+                      Classes="seg-btn"
+                      Classes.active="{Binding IsLogTab}"
+                      Content="Лог"
+                      Command="{Binding SelectLogTabCommand}" />
+            </Grid>
+          </Border>
+
+          <!-- TAB 1: STATUS -->
+          <Grid Grid.Row="1"
+                x:Name="StatusTabPanel"
+                IsVisible="{Binding IsStatusTab}"
+                RowDefinitions="Auto,*">
+
+            <StackPanel Grid.Row="0" Spacing="12" Margin="0,0,0,12">
+              <!-- Startup Repair Hint / BT Error Pill -->
+              <Border x:Name="ToastBanner"
+                      IsVisible="{Binding IsToastVisible}"
+                      Background="{Binding ToastBackgroundBrush}"
+                      BorderBrush="{Binding ToastBorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="11"
+                      Padding="11,8">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding ToastText}"
+                             Foreground="{Binding ToastTextBrush}"
+                             FontSize="12"
+                             TextWrapping="Wrap"
+                             VerticalAlignment="Center" />
+                  <Button x:Name="DismissToastButton"
+                          Grid.Column="1"
+                          IsVisible="{Binding CanDismissToast}"
+                          Command="{Binding DismissToastCommand}"
+                          Background="Transparent"
+                          BorderThickness="0"
+                          Padding="4,2"
+                          Foreground="{Binding ToastTextBrush}"
+                          Content="✕"
+                          FontSize="12"
+                          Cursor="Hand"
+                          VerticalAlignment="Center" />
+                </Grid>
+              </Border>
+
+              <!-- Bridge Pipeline Card -->
+              <Border Background="#0AFFFFFF"
+                      BorderBrush="#1AFFFFFF"
+                      BorderThickness="1"
+                      CornerRadius="12"
+                      Padding="14,12">
+                <Grid ColumnDefinitions="92,*,92" VerticalAlignment="Center">
+                  <StackPanel Grid.Column="0" HorizontalAlignment="Center" Spacing="2">
+                    <TextBlock Text="R2" FontSize="13" FontWeight="SemiBold" Foreground="#F4F4F5" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding R2ShortStatus}" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <Grid Height="10">
+                      <Border Height="2" Background="#29FFFFFF" CornerRadius="1" VerticalAlignment="Center" Margin="6,0" />
+                      <Ellipse Width="6" Height="6" Fill="#10B981" IsVisible="{Binding IsRunning}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBlock Text="{Binding PipeLabel}" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="2" HorizontalAlignment="Center" Spacing="2">
+                    <TextBlock Text="COROS" FontSize="13" FontWeight="SemiBold" Foreground="#F4F4F5" HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding WatchShortStatus}" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </StackPanel>
+
+            <!-- Running Hero Block -->
+            <Border Grid.Row="1"
+                    x:Name="RunningHeroPanel"
+                    IsVisible="{Binding IsRunning}"
+                    VerticalAlignment="Stretch"
+                    Background="#0AFFFFFF"
+                    BorderBrush="#1AFFFFFF"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="14">
+              <Grid RowDefinitions="Auto,*,Auto">
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                  <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="Темп зараз" FontSize="12" Foreground="#A1A1AA" />
+                    <TextBlock x:Name="PaceReadoutText"
+                               Text="{Binding PaceText}"
+                               FontSize="30"
+                               FontWeight="Bold"
+                               Foreground="#FFFFFF" />
+                    <TextBlock IsVisible="{Binding ShowLowSpeedPaceNote}"
+                               Text="на годиннику від 2.5 км/год"
+                               FontSize="12"
+                               Foreground="#FBBF24" />
+                  </StackPanel>
+
+                  <Border Grid.Column="1"
+                          VerticalAlignment="Top"
+                          Background="#2410B981"
+                          BorderBrush="#4010B981"
+                          BorderThickness="1"
+                          CornerRadius="14"
+                          Padding="10,4">
+                    <TextBlock Text="{Binding SpeedText}" FontSize="12" FontWeight="SemiBold" Foreground="#34D399" />
+                  </Border>
+                </Grid>
+
+                <!-- Speed Sparkline -->
+                <Canvas Grid.Row="1" Width="280" Height="40" HorizontalAlignment="Center" VerticalAlignment="Center" ClipToBounds="True">
+                  <Polygon Points="{Binding SparklineFillPoints}" Fill="#2810B981" />
+                  <Polyline Points="{Binding SparklinePoints}"
+                            Stroke="#10B981"
+                            StrokeThickness="2"
+                            StrokeJoin="Round"
+                            StrokeLineCap="Round" />
+                </Canvas>
+
+                <StackPanel Grid.Row="2" Spacing="10">
+                  <Border Height="1" Background="#1AFFFFFF" />
+                  <Grid ColumnDefinitions="*,*,*">
+                    <StackPanel Grid.Column="0" HorizontalAlignment="Center" Spacing="2">
+                      <TextBlock Text="Каденс" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
+                      <TextBlock Text="{Binding CadenceText}" FontSize="13" FontWeight="SemiBold" Foreground="#F4F4F5" HorizontalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Center" Spacing="2">
+                      <TextBlock Text="Кроки" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
+                      <TextBlock Text="{Binding StepsText}" FontSize="13" FontWeight="SemiBold" Foreground="#F4F4F5" HorizontalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Center" Spacing="2">
+                      <TextBlock Text="Час / Дис." FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Center" />
+                      <TextBlock Text="{Binding TimeDistanceText}" FontSize="13" FontWeight="SemiBold" Foreground="#F4F4F5" HorizontalAlignment="Center" />
+                    </StackPanel>
+                  </Grid>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <!-- Calm Idle Block -->
+            <Border Grid.Row="1"
+                    x:Name="IdleHeroPanel"
+                    IsVisible="{Binding IsIdle}"
+                    VerticalAlignment="Stretch"
+                    Background="#0AFFFFFF"
+                    BorderBrush="#1AFFFFFF"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="18">
+              <StackPanel Spacing="8" VerticalAlignment="Center">
+                <TextBlock Text="{Binding IdleTitle}"
+                           FontSize="14"
+                           FontWeight="SemiBold"
+                           Foreground="#F4F4F5"
+                           HorizontalAlignment="Stretch"
+                           TextAlignment="Center" />
+                <TextBlock Text="{Binding IdleDescription}"
+                           FontSize="12"
+                           Foreground="#A1A1AA"
+                           TextWrapping="Wrap"
+                           HorizontalAlignment="Stretch"
+                           TextAlignment="Center" />
+              </StackPanel>
+            </Border>
+
+          </Grid>
+
+          <!-- TAB 2: HISTORY -->
+          <Grid Grid.Row="1" x:Name="HistoryTabPanel" IsVisible="{Binding IsHistoryTab}">
+            <Border IsVisible="{Binding HasNoSessions}"
+                    VerticalAlignment="Stretch"
+                    Background="#0AFFFFFF"
+                    BorderBrush="#1AFFFFFF"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="18">
+              <TextBlock Text="Тут зʼявляться завершені пробіжки (час, дистанція R2 та причина відключення)."
+                         FontSize="12"
+                         Foreground="#A1A1AA"
+                         TextWrapping="Wrap"
+                         VerticalAlignment="Center"
+                         TextAlignment="Center" />
+            </Border>
+
+            <ScrollViewer IsVisible="{Binding HasSessions}"
+                          VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding Sessions}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="8" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SessionItemViewModel">
+                    <Border Background="#0AFFFFFF"
+                            BorderBrush="#1AFFFFFF"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="12,10">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                          <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Foreground="#F4F4F5" />
+                          <TextBlock Text="{Binding Subtitle}" FontSize="12" Foreground="#A1A1AA" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Right" Spacing="2">
+                          <TextBlock Text="{Binding DistanceText}" FontSize="14" FontWeight="Bold" Foreground="#FFFFFF" HorizontalAlignment="Right" />
+                          <TextBlock Text="{Binding AvgPaceText}" FontSize="12" Foreground="#A1A1AA" HorizontalAlignment="Right" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Grid>
+
+          <!-- TAB 3: LOG -->
+          <Border Grid.Row="1"
+                  x:Name="LogTabPanel"
+                  IsVisible="{Binding IsLogTab}"
+                  VerticalAlignment="Stretch"
+                  Background="#0AFFFFFF"
+                  BorderBrush="#1AFFFFFF"
+                  BorderThickness="1"
+                  CornerRadius="12"
+                  Padding="12">
+            <Grid>
+              <TextBlock IsVisible="{Binding HasNoLogs}"
+                         Text="Подій протоколу ще немає."
+                         FontSize="12"
+                         Foreground="#A1A1AA"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center" />
+              <ScrollViewer IsVisible="{Binding HasLogs}" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding LogEntries}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <StackPanel Spacing="4" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding}"
+                                 FontFamily="Consolas, Cascadia Mono, monospace"
+                                 FontSize="12"
+                                 Foreground="#D4D4D8"
+                                 TextWrapping="Wrap" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </Grid>
+          </Border>
+
+        </Grid>
+
+        <!-- Layer 2: Overlay Scrim + Settings & Exit Drawer -->
+        <Grid x:Name="MenuOverlay" IsVisible="{Binding IsMenuOpen}">
+          <Border x:Name="MenuBackdrop" Background="#B80B0D11" />
+          <Border x:Name="MenuDrawer"
+                  VerticalAlignment="Top"
+                  Margin="16,0,16,16"
+                  Background="#FF181B22"
+                  BorderBrush="#33FFFFFF"
+                  BorderThickness="1"
+                  CornerRadius="12"
+                  Padding="12"
+                  BoxShadow="0 12 28 0 #99000000">
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="Автозапуск з Windows"
+                           FontSize="12"
+                           Foreground="#E4E4E7"
+                           VerticalAlignment="Center" />
+                <Button x:Name="AutostartButton"
+                        Grid.Column="1"
+                        Command="{Binding ToggleAutostartCommand}"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        Padding="0"
+                        Cursor="Hand">
+                  <Border Width="36" Height="20" CornerRadius="10" Background="{Binding AutostartBrush}" Padding="2">
+                    <Ellipse Width="16" Height="16" Fill="#FFFFFF" HorizontalAlignment="Left" Margin="{Binding AutostartKnobMargin}" />
+                  </Border>
+                </Button>
+              </Grid>
+
+              <Border Height="1" Background="#1AFFFFFF" />
+
+              <Button x:Name="ExitTriggerButton"
+                      Classes="menu-danger-btn"
+                      Command="{Binding RequestExitCommand}"
+                      HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Left">
+                <TextBlock Text="Вийти з TreadPod" FontSize="12" FontWeight="SemiBold" Foreground="#FB7185" />
+              </Button>
+
+              <Border x:Name="ExitConfirmBox"
+                      IsVisible="{Binding IsExitConfirmOpen}"
+                      Background="#1FF43F5E"
+                      BorderBrush="#4DF43F5E"
+                      BorderThickness="1"
+                      CornerRadius="10"
+                      Padding="10">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Перезапуск змінить BLE-адресу датчика — годинник доведеться додавати заново. Точно вийти?"
+                             FontSize="12"
+                             TextWrapping="Wrap"
+                             Foreground="#FECDD3" />
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
+                    <Button x:Name="ExitCancelButton" Classes="subtle-btn" Content="Ні" Command="{Binding CancelExitCommand}" />
+                    <Button x:Name="ExitConfirmButton" Classes="danger-solid-btn" Content="Вийти" Command="{Binding ConfirmExitCommand}" />
+                  </StackPanel>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Border>
+        </Grid>
+
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

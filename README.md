@@ -17,7 +17,7 @@ Indoor runs on a watch usually force a single fixed speed you have to type in by
   </tr>
 </table>
 
-> **Status:** Windows 11 desktop app (**C# / .NET 8 + Avalonia UI** with **Velopack** installer) is built and passes 25 automated protocol, state-machine, and headless-UI tests plus a live WinRT adapter check. Real FIT-file speed and cadence were verified via the Python prototype ([treadpod.py](treadpod.py)); a full physical run on the C# desktop build is next.
+> **Status:** Windows 11 desktop app (**C# / .NET 8 + Avalonia UI** with **Velopack** installer) is built and passes 27 automated protocol, state-machine, and headless-UI tests plus a live WinRT adapter check. Real FIT-file speed and cadence were verified via the Python prototype ([treadpod.py](treadpod.py)); a full physical run on the C# desktop build is next.
 
 ---
 
@@ -64,7 +64,7 @@ Built with **C# (.NET 8)**, **Avalonia UI**, native `Windows.Devices.Bluetooth` 
 ### Build, test, and install
 
 ```powershell
-# 1. Run protocol, bridge state-machine, and Avalonia headless-UI tests (25 tests)
+# 1. Run protocol, bridge state-machine, and Avalonia headless-UI tests (27 tests)
 dotnet test TreadPod.sln
 
 # 2. Install Velopack CLI once, then build publish/ and package releases\TreadPod-win-Setup.exe (no UAC needed)
@@ -131,7 +131,7 @@ Measurement `0x2A53` (`0x04` flags, uint16 LE speed in `1/256 m/s`, uint8 cadenc
 | PC adapter (`Realtek USB VID 13D3 PID 3571`, peripheral role) | ✅ | Verified via `treadpod_test.py` and `TreadPod.App.exe --check-ble` |
 | Watch speed matches treadmill in `.FIT` | ✅ | `6.0 km/h → 1.67 m/s`, `4.5 → 1.25`, `2.0 → 0.55` |
 | Cadence after `÷ 2` fix | ✅ | `51 spm` in COROS (`191` before) |
-| Protocol, bridge timeouts & headless Avalonia UI (`dotnet test`) | ✅ | 25/25 passing + 4 rendered UI screenshots |
+| Protocol, bridge timeouts & headless Avalonia UI (`dotnet test`) | ✅ | 27/27 passing + 4 rendered UI screenshots |
 | KS Fit gets session after PC read treadmill | ✅ / ❓ | ✅ after `r2_probe.py`; ❓ after a full bridge run |
 | Watch reconnects after app restart | ❌ | Expected: Windows assigns a new random BLE address |
 

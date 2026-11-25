@@ -18,6 +18,7 @@ public sealed class BridgeEngine : IAsyncDisposable
     private readonly Queue<string> _logs = new();
 
     private bool _rscStarted;
+    private bool _canRetryStart;
     private bool _needsWatchRepairHint = true;
     private bool _releasedForThisSession;
     private DateTimeOffset? _lastWatchSeen;
@@ -84,9 +85,11 @@ public sealed class BridgeEngine : IAsyncDisposable
         var result = await _rscServer.StartAsync(cancellationToken).ConfigureAwait(false);
         lock (_sync)
         {
+            var previousError = _errorMessage;
             if (result.Status == RscStartStatus.Started)
             {
                 _rscStarted = true;
+                _canRetryStart = false;
                 _errorMessage = null;
                 _needsWatchRepairHint = true;
                 _phase = BridgePhase.WaitingForWatch;
@@ -97,19 +100,28 @@ public sealed class BridgeEngine : IAsyncDisposable
             else if (result.Status == RscStartStatus.BluetoothOff)
             {
                 _rscStarted = false;
+                _canRetryStart = true;
                 _phase = BridgePhase.BluetoothOff;
                 _r2StatusText = "BT off";
                 _errorMessage = result.Details ?? "Bluetooth is turned off (RADIO_NOT_AVAILABLE)";
                 _lastBluetoothRetry = _timeProvider.GetUtcNow();
-                AppendLogLocked($"ERROR: {_errorMessage}");
+                if (!string.Equals(previousError, _errorMessage, StringComparison.Ordinal))
+                {
+                    AppendLogLocked($"ERROR: {_errorMessage}");
+                }
             }
             else
             {
                 _rscStarted = false;
+                _canRetryStart = result.IsRetryable;
                 _phase = BridgePhase.Error;
                 _r2StatusText = "Error";
                 _errorMessage = result.Details ?? "Failed to start Bluetooth foot pod";
-                AppendLogLocked($"ERROR: {_errorMessage}");
+                _lastBluetoothRetry = _timeProvider.GetUtcNow();
+                if (!string.Equals(previousError, _errorMessage, StringComparison.Ordinal))
+                {
+                    AppendLogLocked($"ERROR: {_errorMessage}");
+                }
             }
         }
 
@@ -137,6 +149,7 @@ public sealed class BridgeEngine : IAsyncDisposable
             if (result.Status == RscStartStatus.Started)
             {
                 _rscStarted = true;
+                _canRetryStart = false;
                 _errorMessage = null;
                 _phase = BridgePhase.WaitingForWatch;
                 _r2StatusText = "Idle";
@@ -147,16 +160,21 @@ public sealed class BridgeEngine : IAsyncDisposable
             else if (result.Status == RscStartStatus.BluetoothOff)
             {
                 _rscStarted = false;
+                _canRetryStart = true;
                 _phase = BridgePhase.BluetoothOff;
                 _r2StatusText = "BT off";
                 _errorMessage = result.Details ?? "Bluetooth is turned off (RADIO_NOT_AVAILABLE)";
+                _lastBluetoothRetry = _timeProvider.GetUtcNow();
                 AppendLogLocked($"ERROR: {_errorMessage}");
             }
             else
             {
                 _rscStarted = false;
+                _canRetryStart = result.IsRetryable;
                 _phase = BridgePhase.Error;
+                _r2StatusText = "Error";
                 _errorMessage = result.Details ?? "Failed to restart BLE advertising after sleep";
+                _lastBluetoothRetry = _timeProvider.GetUtcNow();
                 AppendLogLocked($"ERROR: {_errorMessage}");
             }
         }
@@ -173,7 +191,8 @@ public sealed class BridgeEngine : IAsyncDisposable
             var shouldRetry = false;
             lock (_sync)
             {
-                if (_phase == BridgePhase.BluetoothOff &&
+                if (_canRetryStart &&
+                    _phase is BridgePhase.BluetoothOff or BridgePhase.Error &&
                     (_lastBluetoothRetry is null || now - _lastBluetoothRetry.Value >= TimeSpan.FromSeconds(5)))
                 {
                     _lastBluetoothRetry = now;

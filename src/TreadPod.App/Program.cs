@@ -29,8 +29,34 @@ public static class Program
             return BleSelfCheck.RunAsync().GetAwaiter().GetResult();
         }
 
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
-        return 0;
+        using var singleInstanceMutex = new Mutex(initiallyOwned: false, @"Local\TreadPod.SingleInstance");
+        var hasLock = false;
+        try
+        {
+            try
+            {
+                hasLock = singleInstanceMutex.WaitOne(TimeSpan.FromSeconds(3));
+            }
+            catch (AbandonedMutexException)
+            {
+                hasLock = true;
+            }
+
+            if (!hasLock)
+            {
+                return 0;
+            }
+
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+            return 0;
+        }
+        finally
+        {
+            if (hasLock)
+            {
+                singleInstanceMutex.ReleaseMutex();
+            }
+        }
     }
 
     public static AppBuilder BuildAvaloniaApp() =>

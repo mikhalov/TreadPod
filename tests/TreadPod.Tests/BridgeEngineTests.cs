@@ -20,14 +20,18 @@ public sealed class BridgeEngineTests
         public RscStartResult NextStartResult { get; set; } = new(RscStartStatus.Started);
         public RscStartResult? NextRestartResult { get; set; }
         public bool HasSubscribedClients { get; set; }
+        public int StartCalls { get; private set; }
         public int RestartCount { get; private set; }
         public List<byte[]> Notifications { get; } = [];
         public event Action<string>? DiagnosticMessage;
 
         public void EmitDiagnostic(string message) => DiagnosticMessage?.Invoke(message);
 
-        public Task<RscStartResult> StartAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(NextStartResult);
+        public Task<RscStartResult> StartAsync(CancellationToken cancellationToken)
+        {
+            StartCalls++;
+            return Task.FromResult(NextStartResult);
+        }
 
         public Task<RscStartResult> RestartAdvertisingAsync(CancellationToken cancellationToken)
         {
@@ -348,5 +352,57 @@ public sealed class BridgeEngineTests
         Assert.Equal(1, rsc.RestartCount);
         Assert.False(engine.CurrentSnapshot.NeedsWatchRepairHint);
         Assert.Contains(engine.GetRecentLogs(), l => l.Contains("same address"));
+    }
+
+    [Fact]
+    public async Task TransientAdvertisingFailure_RetriesAutomaticallyAndRecovers()
+    {
+        var clock = new ManualTimeProvider();
+        var rsc = new FakeRscServer
+        {
+            NextStartResult = new RscStartResult(RscStartStatus.Failed, "BLE advertising stopped: Aborted", IsRetryable: true)
+        };
+        var factory = new FakeR2Factory(() => new FakeR2Client());
+        var store = new InMemorySessionStore();
+
+        await using var engine = new BridgeEngine(rsc, factory, store, clock);
+        await engine.StartAsync();
+
+        Assert.Equal(BridgePhase.Error, engine.CurrentSnapshot.Phase);
+        Assert.Equal(1, rsc.StartCalls);
+
+        // Transient GATT/Realtek teardown race clears -> engine recovers on retry tick
+        rsc.NextStartResult = new RscStartResult(RscStartStatus.Started);
+        clock.Advance(TimeSpan.FromSeconds(6));
+        await engine.TickAsync();
+
+        Assert.Equal(BridgePhase.WaitingForWatch, engine.CurrentSnapshot.Phase);
+        Assert.Equal(2, rsc.StartCalls);
+    }
+
+    [Fact]
+    public async Task NonRetryableAdapterFailure_DoesNotRetry()
+    {
+        var clock = new ManualTimeProvider();
+        var rsc = new FakeRscServer
+        {
+            NextStartResult = new RscStartResult(
+                RscStartStatus.Failed,
+                "Bluetooth adapter does not support BLE peripheral role",
+                IsRetryable: false)
+        };
+        var factory = new FakeR2Factory(() => new FakeR2Client());
+        var store = new InMemorySessionStore();
+
+        await using var engine = new BridgeEngine(rsc, factory, store, clock);
+        await engine.StartAsync();
+
+        Assert.Equal(BridgePhase.Error, engine.CurrentSnapshot.Phase);
+
+        clock.Advance(TimeSpan.FromSeconds(20));
+        await engine.TickAsync();
+
+        Assert.Equal(BridgePhase.Error, engine.CurrentSnapshot.Phase);
+        Assert.Equal(1, rsc.StartCalls);
     }
 }

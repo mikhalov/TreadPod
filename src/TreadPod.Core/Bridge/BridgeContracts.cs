@@ -44,7 +44,11 @@ public enum RscStartStatus
     Failed
 }
 
-public sealed record RscStartResult(RscStartStatus Status, string? Details = null, bool AddressPreserved = false);
+public sealed record RscStartResult(
+    RscStartStatus Status,
+    string? Details = null,
+    bool AddressPreserved = false,
+    bool IsRetryable = true);
 
 public interface IRscPeripheralServer : IAsyncDisposable
 {

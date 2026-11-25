@@ -30,6 +30,26 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
 
     public async Task<RscStartResult> StartAsync(CancellationToken cancellationToken)
     {
+        const int maxAttempts = 2;
+        RscStartResult lastResult = new(RscStartStatus.Failed, "Failed to start BLE advertising");
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            lastResult = await StartOnceAsync(cancellationToken).ConfigureAwait(false);
+            if (lastResult.Status != RscStartStatus.Failed || !lastResult.IsRetryable || attempt == maxAttempts)
+            {
+                return lastResult;
+            }
+
+            DiagnosticMessage?.Invoke($"BLE start attempt {attempt} failed ({lastResult.Details}); retrying...");
+            await Task.Delay(1500, cancellationToken).ConfigureAwait(false);
+        }
+
+        return lastResult;
+    }
+
+    private async Task<RscStartResult> StartOnceAsync(CancellationToken cancellationToken)
+    {
         cancellationToken.ThrowIfCancellationRequested();
 
         var adapter = await BluetoothAdapter.GetDefaultAsync();
@@ -40,7 +60,10 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
 
         if (!adapter.IsPeripheralRoleSupported)
         {
-            return new RscStartResult(RscStartStatus.Failed, "Bluetooth adapter does not support BLE peripheral role");
+            return new RscStartResult(
+                RscStartStatus.Failed,
+                "Bluetooth adapter does not support BLE peripheral role",
+                IsRetryable: false);
         }
 
         var result = await GattServiceProvider.CreateAsync(RscProtocol.ServiceUuid);
@@ -92,9 +115,15 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
 
         var startedTcs = new TaskCompletionSource<GattServiceProviderAdvertisementStatus>(
             TaskCreationOptions.RunContinuationsAsynchronously);
+        var lastAdvError = BluetoothError.Success;
 
         void OnInitStatusChanged(GattServiceProvider sender, GattServiceProviderAdvertisementStatusChangedEventArgs args)
         {
+            if (args.Error != BluetoothError.Success)
+            {
+                lastAdvError = args.Error;
+            }
+
             if (args.Status is GattServiceProviderAdvertisementStatus.Started
                 or GattServiceProviderAdvertisementStatus.StartedWithoutAllAdvertisementData)
             {
@@ -112,7 +141,7 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
                 startedTcs.TrySetResult(provider.AdvertisementStatus);
             }
 
-            await Task.WhenAny(startedTcs.Task, Task.Delay(2000, cancellationToken)).ConfigureAwait(false);
+            await Task.WhenAny(startedTcs.Task, Task.Delay(3000, cancellationToken)).ConfigureAwait(false);
         }
         finally
         {
@@ -124,7 +153,11 @@ public sealed class WinRtRscPeripheralServer : IRscPeripheralServer
             or GattServiceProviderAdvertisementStatus.Stopped)
         {
             await DisposeAsync().ConfigureAwait(false);
-            return new RscStartResult(RscStartStatus.Failed, $"BLE advertising stopped: {advStatus}");
+            var errDetail = lastAdvError == BluetoothError.Success ? string.Empty : $" ({lastAdvError})";
+            return new RscStartResult(
+                RscStartStatus.Failed,
+                $"BLE advertising stopped: {advStatus}{errDetail}",
+                IsRetryable: true);
         }
 
         return new RscStartResult(RscStartStatus.Started, $"status={advStatus}");

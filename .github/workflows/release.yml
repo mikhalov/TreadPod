@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without leading v (e.g. 0.1.6)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Windows Release
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Resolve release version
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $raw = "${{ inputs.version }}".Trim()
+          } else {
+            $raw = "${{ github.ref_name }}".Trim()
+          }
+
+          $version = $raw -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+([.-][0-9A-Za-z.-]+)?$') {
+            throw "Invalid release version '$raw'. Expected semantic version like 0.1.6 or v0.1.6."
+          }
+
+          $tag = if ("${{ github.event_name }}" -eq "workflow_dispatch") { "v$version" } else { "${{ github.ref_name }}" }
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_VERSION=$version"
+          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_TAG=$tag"
+          Write-Host "Resolved version=$version tag=$tag"
+
+      - name: Run unit and headless UI tests
+        run: dotnet test TreadPod.sln --configuration Release
+
+      - name: Install Velopack CLI
+        run: dotnet tool install -g vpk --version 1.2.161
+
+      - name: Build installer and portable package
+        run: .\build-installer.ps1 -Version $env:RELEASE_VERSION
+
+      - name: Generate SHA256 checksums
+        run: |
+          $files = @(
+            "releases\TreadPod-win-Setup.exe",
+            "releases\TreadPod-win-Portable.zip"
+          )
+          $lines = foreach ($file in $files) {
+            if (-not (Test-Path $file)) {
+              throw "Expected release artifact not found: $file"
+            }
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+            $name = Split-Path $file -Leaf
+            "$hash  $name"
+          }
+          $lines | Set-Content -Path "releases\SHA256SUMS.txt" -Encoding utf8NoBOM
+
+      - name: Prepare release notes
+        run: |
+          $notes = @(
+            '### Downloads',
+            '',
+            '- **`TreadPod-win-Setup.exe`** *(recommended)* — 1-click Velopack installer (no UAC needed, installs to `%LocalAppData%\TreadPod`, creates a Start Menu shortcut, and cleans up autostart on uninstall; automatically prompts to install `.NET 8 Desktop Runtime` if not already present).',
+            '- **`TreadPod-win-Portable.zip`** — extract-and-run portable build.',
+            '- **`SHA256SUMS.txt`** — SHA-256 checksums for both artifacts.',
+            '',
+            '> **Windows SmartScreen note:** These binaries are unsigned open-source builds compiled directly from this repository via GitHub Actions. On first launch, Windows may show *"Windows protected your PC"* — click **More info → Run anyway** (and verify against `SHA256SUMS.txt` if desired).'
+          ) -join "`n"
+          $notes | Set-Content -Path "release-notes.md" -Encoding utf8NoBOM
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$env:RELEASE_TAG" `
+            "releases\TreadPod-win-Setup.exe" `
+            "releases\TreadPod-win-Portable.zip" `
+            "releases\SHA256SUMS.txt" `
+            --title "TreadPod $env:RELEASE_TAG" `
+            --notes-file "release-notes.md"

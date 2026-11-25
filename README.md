@@ -61,6 +61,15 @@ Built with **C# (.NET 8)**, **Avalonia UI**, native `Windows.Devices.Bluetooth` 
 - **Clean install & uninstall:** Autostart toggle (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) cleans up automatically when uninstalled via Velopack.
 - **English / Ukrainian UI:** Built-in `EN | UK` language switch in the `···` settings menu (persisted to `%LocalAppData%\TreadPod\settings.json`).
 
+### Download
+
+Grab the latest Windows build from [**Releases**](https://github.com/mikhalov/TreadPod/releases/latest):
+
+- **`TreadPod-win-Setup.exe`** *(recommended)* — 1-click Velopack installer (no UAC, Start Menu shortcut, clean uninstall).
+- **`TreadPod-win-Portable.zip`** — portable archive (extract and run).
+
+> Releases are compiled transparently from this repo via GitHub Actions. Because binaries are unsigned, Windows SmartScreen may show an *"unrecognized app"* prompt on first run — click **More info → Run anyway** (or verify `SHA256SUMS.txt`).
+
 ### Build, test, and install
 
 ```powershell
@@ -162,6 +171,7 @@ py r2_probe.py                                  # raw read-only R2 status log
 | [src/TreadPod.App](src/TreadPod.App) | Avalonia UI tray popover, WinRT BLE client/server, autostart, sleep/wake monitor, and JSON session store |
 | [tests/TreadPod.Tests](tests/TreadPod.Tests) | xUnit protocol/bridge tests + `Avalonia.Headless.XUnit` click-through & screenshot tests |
 | [build-installer.ps1](build-installer.ps1) | Publishes `TreadPod.App` and packs `releases\TreadPod-win-Setup.exe` via Velopack |
+| [.github/workflows/release.yml](.github/workflows/release.yml) | Automated Windows release build (`Setup.exe`, `Portable.zip`, `SHA256SUMS.txt`) on `v*` tags |
 | [treadpod.py](treadpod.py), [r2_probe.py](r2_probe.py), [treadpod_test.py](treadpod_test.py) | Original Python prototype & hardware diagnostic probes |
 
 ---

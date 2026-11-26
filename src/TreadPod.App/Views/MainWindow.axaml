@@ -387,14 +387,15 @@
                   BorderThickness="1"
                   CornerRadius="12"
                   Padding="12">
-            <Grid>
-              <TextBlock IsVisible="{Binding HasNoLogs}"
+            <Grid RowDefinitions="*,Auto" RowSpacing="8">
+              <TextBlock Grid.Row="0"
+                         IsVisible="{Binding HasNoLogs}"
                          Text="{Binding Text.LogEmpty}"
                          FontSize="12"
                          Foreground="#A1A1AA"
                          HorizontalAlignment="Center"
                          VerticalAlignment="Center" />
-              <ScrollViewer IsVisible="{Binding HasLogs}" VerticalScrollBarVisibility="Auto">
+              <ScrollViewer Grid.Row="0" IsVisible="{Binding HasLogs}" VerticalScrollBarVisibility="Auto">
                 <ItemsControl ItemsSource="{Binding LogEntries}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -412,6 +413,20 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
               </ScrollViewer>
+              <StackPanel Grid.Row="1"
+                          Orientation="Horizontal"
+                          HorizontalAlignment="Right"
+                          Spacing="6">
+                <Button x:Name="OpenLogsFolderButton"
+                        Classes="subtle-btn"
+                        Content="{Binding Text.OpenLogsFolderLabel}"
+                        Command="{Binding OpenLogsFolderCommand}" />
+                <Button x:Name="CopyLogButton"
+                        Classes="subtle-btn"
+                        IsEnabled="{Binding HasLogs}"
+                        Content="{Binding CopyLogButtonText}"
+                        Command="{Binding CopyLogCommand}" />
+              </StackPanel>
             </Grid>
           </Border>
 

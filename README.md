@@ -17,7 +17,7 @@ Indoor runs on a watch usually force a single fixed speed you have to type in by
   </tr>
 </table>
 
-> **Status:** Windows 11 desktop app (**C# / .NET 8 + Avalonia UI** with **Velopack** installer) is built and passes 27 automated protocol, state-machine, and headless-UI tests plus a live WinRT adapter check. Real FIT-file speed and cadence were verified via the Python prototype ([treadpod.py](treadpod.py)); a full physical run on the C# desktop build is next.
+> **Status:** Windows 11 desktop app (**C# / .NET 8 + Avalonia UI** with **Velopack** installer) is built and passes 28 automated protocol, state-machine, and headless-UI tests plus a live WinRT adapter check. Real FIT-file speed and cadence were verified via the Python prototype ([treadpod.py](treadpod.py)); a full physical run on the C# desktop build is next.
 
 ---
 
@@ -57,7 +57,7 @@ Built with **C# (.NET 8)**, **Avalonia UI**, native `Windows.Devices.Bluetooth` 
 
 - **Tray-first popover:** Lives cleanly in the system tray with a color-coded status dot (gray waiting · amber scanning/idle · green running · blue released for KS Fit · red Bluetooth off), optional stay-on-top pin, and an inline confirmation warning before quitting.
 - **Sleep/wake aware:** Watches Windows power resume events, restarts GATT advertising automatically, and brings back the re-pair banner.
-- **History & protocol log:** Saves completed runs locally to `%LocalAppData%\TreadPod\sessions.json` and exposes the last 100 BLE/state events in the **Log** tab.
+- **History & protocol log:** Saves completed runs locally to `%LocalAppData%\TreadPod\sessions.json`, writes rolling debug logs to `%LocalAppData%\TreadPod\logs\`, and offers 1-click Copy / Logs folder buttons in the **Log** tab.
 - **Clean install & uninstall:** Autostart toggle (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) cleans up automatically when uninstalled via Velopack.
 - **English / Ukrainian UI:** Built-in `EN | UK` language switch in the `···` settings menu (persisted to `%LocalAppData%\TreadPod\settings.json`).
 
@@ -73,7 +73,7 @@ Grab the latest Windows build from [**Releases**](https://github.com/mikhalov/Tr
 ### Build, test, and install
 
 ```powershell
-# 1. Run protocol, bridge state-machine, and Avalonia headless-UI tests (27 tests)
+# 1. Run protocol, bridge state-machine, and Avalonia headless-UI tests (28 tests)
 dotnet test TreadPod.sln
 
 # 2. Install Velopack CLI once, then build publish/ and package releases\TreadPod-win-Setup.exe (no UAC needed)
@@ -140,7 +140,7 @@ Measurement `0x2A53` (`0x04` flags, uint16 LE speed in `1/256 m/s`, uint8 cadenc
 | PC adapter (`Realtek USB VID 13D3 PID 3571`, peripheral role) | ✅ | Verified via `treadpod_test.py` and `TreadPod.App.exe --check-ble` |
 | Watch speed matches treadmill in `.FIT` | ✅ | `6.0 km/h → 1.67 m/s`, `4.5 → 1.25`, `2.0 → 0.55` |
 | Cadence after `÷ 2` fix | ✅ | `51 spm` in COROS (`191` before) |
-| Protocol, bridge timeouts & headless Avalonia UI (`dotnet test`) | ✅ | 27/27 passing + 4 rendered UI screenshots |
+| Protocol, bridge timeouts & headless Avalonia UI (`dotnet test`) | ✅ | 28/28 passing + 5 rendered UI screenshots |
 | KS Fit gets session after PC read treadmill | ✅ / ❓ | ✅ after `r2_probe.py`; ❓ after a full bridge run |
 | Watch reconnects after app restart | ❌ | Expected: Windows assigns a new random BLE address |
 

@@ -75,6 +75,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private bool _isMenuOpen;
     private bool _isExitConfirmOpen;
     private bool _isAutostartEnabled;
+    private bool _isLogCopied;
     private bool _hintDismissed;
     private bool _needsWatchRepairHint = true;
     private string? _errorMessage;
@@ -125,6 +126,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         ToggleAutostartCommand = new RelayCommand(ToggleAutostart);
         SetEnglishCommand = new RelayCommand(() => SetLanguage(AppLanguage.En));
         SetUkrainianCommand = new RelayCommand(() => SetLanguage(AppLanguage.Uk));
+        CopyLogCommand = new RelayCommand(CopyLog);
+        OpenLogsFolderCommand = new RelayCommand(() => OpenLogsFolderRequested?.Invoke());
         DismissToastCommand = new RelayCommand(() =>
         {
             _hintDismissed = true;
@@ -146,6 +149,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public event Action? ExitRequested;
     public event Action<BridgePhase>? StatusVisualChanged;
     public event Action<AppLanguage>? LanguageChanged;
+    public event Action<string>? CopyLogsRequested;
+    public event Action? OpenLogsFolderRequested;
 
     public ICommand SelectStatusTabCommand { get; }
     public ICommand SelectHistoryTabCommand { get; }
@@ -156,6 +161,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public ICommand ToggleAutostartCommand { get; }
     public ICommand SetEnglishCommand { get; }
     public ICommand SetUkrainianCommand { get; }
+    public ICommand CopyLogCommand { get; }
+    public ICommand OpenLogsFolderCommand { get; }
     public ICommand DismissToastCommand { get; }
     public ICommand RequestExitCommand { get; }
     public ICommand CancelExitCommand { get; }
@@ -166,6 +173,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public UiStrings Text => UiStrings.For(_language);
     public bool IsEnglish => _language == AppLanguage.En;
     public bool IsUkrainian => _language == AppLanguage.Uk;
+    public string CopyLogButtonText => _isLogCopied ? Text.CopiedLogLabel : Text.CopyLogLabel;
 
     public ObservableCollection<SessionItemViewModel> Sessions { get; } = [];
     public ObservableCollection<string> LogEntries { get; } = [];
@@ -177,6 +185,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (SetField(ref _selectedTab, value))
             {
+                _isLogCopied = false;
+                OnPropertyChanged(nameof(CopyLogButtonText));
                 OnPropertyChanged(nameof(IsStatusTab));
                 OnPropertyChanged(nameof(IsHistoryTab));
                 OnPropertyChanged(nameof(IsLogTab));
@@ -345,11 +355,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         _language = language;
         _settingsStore?.SaveLanguage(language);
+        _isLogCopied = false;
 
         OnPropertyChanged(nameof(Language));
         OnPropertyChanged(nameof(Text));
         OnPropertyChanged(nameof(IsEnglish));
         OnPropertyChanged(nameof(IsUkrainian));
+        OnPropertyChanged(nameof(CopyLogButtonText));
 
         if (_lastSnapshot is not null)
         {
@@ -525,6 +537,18 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         OnPropertyChanged(nameof(HasLogs));
         OnPropertyChanged(nameof(HasNoLogs));
+    }
+
+    private void CopyLog()
+    {
+        if (LogEntries.Count == 0)
+        {
+            return;
+        }
+
+        CopyLogsRequested?.Invoke(string.Join(Environment.NewLine, LogEntries));
+        _isLogCopied = true;
+        OnPropertyChanged(nameof(CopyLogButtonText));
     }
 
     private void ToggleAutostart()

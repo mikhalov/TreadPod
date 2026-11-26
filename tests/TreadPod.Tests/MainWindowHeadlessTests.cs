@@ -26,7 +26,11 @@ public sealed class MainWindowHeadlessTests
 
         var vm = new MainViewModel(initialLanguage: AppLanguage.En);
         var exitFired = false;
+        string? copiedLogText = null;
+        var openLogsFired = false;
         vm.ExitRequested += () => exitFired = true;
+        vm.CopyLogsRequested += text => copiedLogText = text;
+        vm.OpenLogsFolderRequested += () => openLogsFired = true;
 
         var window = new MainWindow
         {
@@ -108,10 +112,20 @@ public sealed class MainWindowHeadlessTests
         Assert.Equal(430, window.Bounds.Height);
         SaveFrame(window, "03_history.png");
 
-        // Click Log tab and verify
+        // Click Log tab, capture frame, and verify Copy + Logs folder actions
         ClickControl(window, window.FindControl<Button>("TabLogButton")!);
         Assert.True(window.FindControl<Control>("LogTabPanel")!.IsVisible);
         Assert.Equal(430, window.Bounds.Height);
+        SaveFrame(window, "05_log_tab.png");
+
+        var copyLogButton = window.FindControl<Button>("CopyLogButton")!;
+        ClickControl(window, copyLogButton);
+        Assert.NotNull(copiedLogText);
+        Assert.Contains("RSC 0x2A53 notify", copiedLogText);
+        Assert.Equal("Copied", copyLogButton.Content);
+
+        ClickControl(window, window.FindControl<Button>("OpenLogsFolderButton")!);
+        Assert.True(openLogsFired);
 
         // Return to Status tab, test Pin toggle
         ClickControl(window, window.FindControl<Button>("TabStatusButton")!);

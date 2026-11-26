@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -15,6 +16,7 @@ namespace TreadPod.App;
 public sealed class App : Application
 {
     private BridgeEngine? _engine;
+    private FileLogSink? _fileLogSink;
     private PowerResumeMonitor? _powerMonitor;
     private CancellationTokenSource? _loopCts;
     private Task? _loopTask;
@@ -37,6 +39,25 @@ public sealed class App : Application
             _desktop = desktop;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
+            try
+            {
+                _fileLogSink = new FileLogSink();
+                _fileLogSink.WriteSystem("--- TreadPod started ---");
+            }
+            catch
+            {
+                // Ignore if %LocalAppData%\TreadPod\logs is unwritable.
+            }
+
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                _fileLogSink?.WriteSystem($"FATAL UnhandledException: {e.ExceptionObject}");
+            };
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                _fileLogSink?.WriteSystem($"UnobservedTaskException: {e.Exception}");
+            };
+
             var autostart = new WindowsAutostartService();
             var settingsStore = new JsonAppSettingsStore();
             var initialLanguage = settingsStore.LoadLanguage() ?? JsonAppSettingsStore.DetectDefaultLanguage();
@@ -51,6 +72,14 @@ public sealed class App : Application
             _viewModel.HideRequested += () => _mainWindow?.Hide();
             _viewModel.ExitRequested += () => _ = ShutdownGracefullyAsync();
             _viewModel.LanguageChanged += lang => Dispatcher.UIThread.Post(() => ApplyTrayLanguage(lang));
+            _viewModel.CopyLogsRequested += text =>
+            {
+                if (_mainWindow?.Clipboard is { } clipboard)
+                {
+                    _ = clipboard.SetTextAsync(text);
+                }
+            };
+            _viewModel.OpenLogsFolderRequested += OpenLogsFolder;
             _viewModel.StatusVisualChanged += phase =>
             {
                 Dispatcher.UIThread.Post(() =>
@@ -68,6 +97,7 @@ public sealed class App : Application
             };
             _engine.LogAdded += line =>
             {
+                _fileLogSink?.Write(line);
                 Dispatcher.UIThread.Post(() => _viewModel?.AddLog(line));
             };
             _engine.SessionsChanged += () =>
@@ -201,7 +231,29 @@ public sealed class App : Application
         }
         catch (Exception ex)
         {
+            _fileLogSink?.WriteSystem($"Loop error: {ex.Message}");
             Dispatcher.UIThread.Post(() => _viewModel?.AddLog($"Loop error: {ex.Message}"));
+        }
+    }
+
+    private void OpenLogsFolder()
+    {
+        try
+        {
+            var dir = _fileLogSink?.LogDirectory ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "TreadPod",
+                "logs");
+            Directory.CreateDirectory(dir);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = dir,
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            // Ignore shell open failures.
         }
     }
 
@@ -224,6 +276,12 @@ public sealed class App : Application
         catch
         {
             // Continue shutting down UI cleanly.
+        }
+        finally
+        {
+            _fileLogSink?.WriteSystem("--- TreadPod exiting ---");
+            _fileLogSink?.Dispose();
+            _fileLogSink = null;
         }
 
         Dispatcher.UIThread.Post(() =>

@@ -63,6 +63,9 @@ public sealed class UiStrings
 
     public required string HistoryEmpty { get; init; }
     public required string LogEmpty { get; init; }
+    public required string CopyLogLabel { get; init; }
+    public required string CopiedLogLabel { get; init; }
+    public required string OpenLogsFolderLabel { get; init; }
 
     public required string AutostartLabel { get; init; }
     public required string LanguageLabel { get; init; }
@@ -156,6 +159,9 @@ public sealed class UiStrings
 
         HistoryEmpty = "Completed runs will appear here (duration, R2 distance, and release reason).",
         LogEmpty = "No protocol events yet.",
+        CopyLogLabel = "Copy",
+        CopiedLogLabel = "Copied",
+        OpenLogsFolderLabel = "Logs folder",
 
         AutostartLabel = "Start with Windows",
         LanguageLabel = "Language",
@@ -238,6 +244,9 @@ public sealed class UiStrings
 
         HistoryEmpty = "Тут зʼявляться завершені пробіжки (час, дистанція R2 та причина відключення).",
         LogEmpty = "Подій протоколу ще немає.",
+        CopyLogLabel = "Копіювати",
+        CopiedLogLabel = "Скопійовано",
+        OpenLogsFolderLabel = "Папка логів",
 
         AutostartLabel = "Автозапуск з Windows",
         LanguageLabel = "Мова",

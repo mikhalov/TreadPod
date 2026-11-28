@@ -101,7 +101,7 @@ If re-pairing ever gets annoying, here are the real ways out:
 
 | Option | Cost | Verdict |
 |---|---|---|
-| **ESP32 board** running the whole bridge ([firmware/](firmware/)) | ~300 UAH *(estimate, not checked)* | **Recommended:** static BLE address, no PC needed. Works on an ESP-WROOM-32 (2026-11-28): the watch reconnects after a board reset without re-pairing; first full bridge run recorded 99 m on the watch vs 0.09 km in KS Fit, and KS Fit connected after the run |
+| **ESP32 board** running the whole bridge ([firmware/](firmware/)) | ~300 UAH *(estimate, not checked)* | **Recommended:** static BLE address, no PC needed. Works on an ESP-WROOM-32 (2026-11-28): the watch reconnects after a board reset without re-pairing; 13.5 min run with Wi-Fi on: no watch or treadmill drops, 1.06 km on the watch vs 1.08 km in KS Fit (<2 %), treadmill released 30 s after saving, KS Fit got the session |
 | Dedicated USB BLE dongle + Bumble stack | dongle | Works, but still requires the PC to stay on |
 | WSL2 + `usbipd` + BlueZ | free | Needs a custom WSL kernel; fragile |
 

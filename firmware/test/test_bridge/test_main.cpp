@@ -262,6 +262,7 @@ void failed_scan_and_r2_drop_retry_only_when_subscribed() {
     emit(bridge, 13100, 1, 60, 10);
     TEST_ASSERT_TRUE(bridge.tick(14000, false) == Action::Poll);
     TEST_ASSERT_TRUE(bridge.onPollResult(14000, false) == Action::ReleaseForR2Drop);
+    TEST_ASSERT_EQUAL_UINT32(0, bridge.statusTimeouts());
     TEST_ASSERT_EQUAL_INT(0, bridge.snapshot().cadenceSpm);
     TEST_ASSERT_TRUE(bridge.tick(15000, false) == Action::None);
     TEST_ASSERT_TRUE(bridge.tick(16000, true) == Action::StartScan);
@@ -273,7 +274,9 @@ void no_first_status_times_out_ten_seconds_after_connection() {
     Bridge bridge;
     connect(bridge);
     TEST_ASSERT_TRUE(bridge.onPollResult(10999, true) == Action::None);
+    TEST_ASSERT_EQUAL_UINT32(0, bridge.statusTimeouts());
     TEST_ASSERT_TRUE(bridge.onPollResult(11000, true) == Action::ReleaseForR2Drop);
+    TEST_ASSERT_EQUAL_UINT32(1, bridge.statusTimeouts());
 }
 
 void valid_status_refreshes_timeout_and_silence_clears_speed() {
@@ -298,6 +301,7 @@ void valid_status_refreshes_timeout_and_silence_clears_speed() {
     TEST_ASSERT_TRUE(bridge.tick(22000, true, ScanResult::Connected) == Action::Poll);
     TEST_ASSERT_TRUE(bridge.onPollResult(31999, true) == Action::None);
     TEST_ASSERT_TRUE(bridge.onPollResult(32000, true) == Action::ReleaseForR2Drop);
+    TEST_ASSERT_EQUAL_UINT32(2, bridge.statusTimeouts());
 }
 
 void advertising_retries_transient_failures_after_five_seconds() {

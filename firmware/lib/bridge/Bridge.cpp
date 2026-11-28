@@ -52,6 +52,9 @@ Action Bridge::onPollResult(TimeMs now, bool success) {
         return Action::None;
     }
     if (!success || now - lastStatus_ >= kStatusTimeout) {
+        if (success) {
+            ++statusTimeouts_;
+        }
         release(false);
         return Action::ReleaseForR2Drop;
     }

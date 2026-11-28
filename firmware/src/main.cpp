@@ -1,5 +1,9 @@
 #include <Arduino.h>
+#include <ESPmDNS.h>
 #include <NimBLEDevice.h>
+#include <WebServer.h>
+#include <WiFi.h>
+#include <esp_sntp.h>
 #include <esp_timer.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
@@ -11,11 +15,14 @@
 #endif
 
 #include <Bridge.h>
+#include "wifi_secrets.h"
 
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdio>
+#include <ctime>
+#include <type_traits>
 #include <utility>
 
 namespace {
@@ -26,6 +33,8 @@ static_assert(CONFIG_BT_NIMBLE_ROLE_CENTRAL && CONFIG_BT_NIMBLE_ROLE_OBSERVER &&
               "TreadPod needs BLE central and peripheral roles and two simultaneous links");
 
 constexpr char kDeviceName[] = "TreadPod";
+constexpr char kHostname[] = "treadpod";
+constexpr char kKyivTimezone[] = "EET-2EEST,M3.5.0/3,M10.5.0/4";
 constexpr uint32_t kScanTimeoutMs = 10000;
 constexpr TimeMs kConnectDeadlineMs = 15000;
 constexpr TimeMs kTickIntervalMs = 1000;
@@ -50,6 +59,9 @@ public:
     }
 
     WatchState state() const { return state_.load(); }
+    unsigned subscribedHandles() const { return subscribedHandles_.load(); }
+    unsigned connects() const { return connects_.load(); }
+    unsigned disconnects() const { return disconnects_.load(); }
 
     void notify(const Measurement& payload) {
         xQueueOverwrite(measurements_, &payload);
@@ -64,6 +76,7 @@ private:
     };
 
     void onConnect(NimBLEServer*, NimBLEConnInfo& conn) override {
+        ++connects_;
         if (auto* peer = registerPeer(conn.getConnHandle())) {
             peer->connectReported = true;
             updateState();
@@ -71,6 +84,7 @@ private:
     }
 
     void onDisconnect(NimBLEServer*, NimBLEConnInfo& conn, int) override {
+        ++disconnects_;
         if (auto* peer = find(conn.getConnHandle())) {
             *peer = Peer{};
             updateState();
@@ -109,17 +123,15 @@ private:
     }
 
     void updateState() {
-        auto next = WatchState::Disconnected;
+        bool connected = false;
+        unsigned subscribed = 0;
         for (const auto& peer : peers_) {
-            if (peer.subscribed) {
-                next = WatchState::Subscribed;
-                break;
-            }
-            if (peer.handle != BLE_HS_CONN_HANDLE_NONE) {
-                next = WatchState::Connected;
-            }
+            connected |= peer.handle != BLE_HS_CONN_HANDLE_NONE;
+            subscribed += peer.subscribed;
         }
-        state_ = next;
+        subscribedHandles_ = subscribed;
+        state_ = subscribed ? WatchState::Subscribed
+                            : connected ? WatchState::Connected : WatchState::Disconnected;
     }
 
     static void sendMeasurement(ble_npl_event* event) {
@@ -137,6 +149,9 @@ private:
 
     std::array<Peer, CONFIG_BT_NIMBLE_MAX_CONNECTIONS> peers_{};
     std::atomic<WatchState> state_{WatchState::Disconnected};
+    std::atomic<unsigned> subscribedHandles_{0};
+    std::atomic<unsigned> connects_{0};
+    std::atomic<unsigned> disconnects_{0};
     QueueHandle_t measurements_ = nullptr;
     NimBLECharacteristic* measurement_ = nullptr;
     ble_npl_event notifyEvent_{};
@@ -259,6 +274,8 @@ public:
     }
 
     ScanResult takeScanResult() { return std::exchange(scanResult_, ScanResult::Pending); }
+    unsigned connects() const { return connects_.load(); }
+    unsigned drops() const { return drops_.load(); }
 
     void drainPackets(Bridge& bridge) {
         xSemaphoreTake(packetMutex_, portMAX_DELAY);
@@ -321,11 +338,17 @@ private:
 
     void onScanEnd(const NimBLEScanResults&, int) override { scanEnded_ = true; }
     void onConnect(NimBLEClient*) override {
+        ++connects_;
         const ConnectionUpdate update{attempt_.load(), ConnectionEvent::Connected};
         xQueueOverwrite(connectionUpdates_, &update);
     }
     void onConnectFail(NimBLEClient*, int) override { deferEnded(); }
-    void onDisconnect(NimBLEClient*, int) override { deferEnded(); }
+    void onDisconnect(NimBLEClient*, int) override {
+        if (closingAttempt_.load() != attempt_.load()) {
+            ++drops_;
+        }
+        deferEnded();
+    }
 
     void deferEnded() {
         // The library clears its connection state after onDisconnect returns.
@@ -438,6 +461,8 @@ private:
     std::atomic<bool> scanEnded_{false};
     std::atomic<uint32_t> attempt_{0};
     std::atomic<uint32_t> closingAttempt_{0};
+    std::atomic<unsigned> connects_{0};
+    std::atomic<unsigned> drops_{0};
     uint32_t endedAttempt_ = 0;      // Host task only.
     uint32_t cancelledAttempt_ = 0;  // Host task only.
     ble_npl_event endedEvent_{};
@@ -452,6 +477,21 @@ private:
 
 R2Link r2;
 Bridge bridge;
+
+struct StatusReport {
+    Snapshot bridge;
+    unsigned subscribedHandles = 0;
+    unsigned watchConnects = 0;
+    unsigned watchDisconnects = 0;
+    unsigned r2Connects = 0;
+    unsigned r2Drops = 0;
+    unsigned r2StatusTimeouts = 0;
+};
+static_assert(std::is_trivially_copyable_v<StatusReport>);
+
+QueueHandle_t statusReports = nullptr;
+std::atomic<bool> wifiUp{false};
+std::atomic<bool> timeSynced{false};
 
 bool configureBle() {
     if (!NimBLEDevice::init(kDeviceName) || !NimBLEDevice::setOwnAddrType(BLE_OWN_ADDR_PUBLIC) || !r2.configure()) {
@@ -534,6 +574,84 @@ const char* r2Label(R2State state) {
     }
     return "?";
 }
+
+void sendStatus(WebServer& server) {
+    StatusReport report{};
+    xQueuePeek(statusReports, &report, 0);
+
+    char localTime[28] = "null";
+    if (timeSynced.load()) {
+        const auto now = std::time(nullptr);
+        std::tm local{};
+        char iso[25];
+        if (localtime_r(&now, &local) && std::strftime(iso, sizeof(iso), "%Y-%m-%dT%H:%M:%S%z", &local) == 24) {
+            std::snprintf(localTime, sizeof(localTime), "\"%.22s:%s\"", iso, iso + 22);
+        }
+    }
+
+    char belt[5] = "null";
+    if (report.bridge.beltState) {
+        std::snprintf(belt, sizeof(belt), "%u", static_cast<unsigned>(*report.bridge.beltState));
+    }
+    char json[512];
+    std::snprintf(json, sizeof(json),
+                  "{\"uptime_ms\":%llu,\"time\":%s,\"wifi_rssi\":%ld,"
+                  "\"watch\":{\"subscribed\":%s,\"subscribed_handles\":%u},"
+                  "\"r2_state\":\"%s\",\"belt_state\":%s,\"kmh\":%.1f,\"spm\":%d,\"steps\":%d,"
+                  "\"watch_connects\":%u,\"watch_disconnects\":%u,\"r2_connects\":%u,"
+                  "\"r2_drops\":%u,\"r2_status_timeouts\":%u}",
+                  static_cast<unsigned long long>(nowMs()), localTime, static_cast<long>(WiFi.RSSI()),
+                  report.subscribedHandles ? "true" : "false", report.subscribedHandles,
+                  r2Label(report.bridge.r2), belt, report.bridge.speedKmh, report.bridge.cadenceSpm,
+                  report.bridge.steps, report.watchConnects, report.watchDisconnects, report.r2Connects,
+                  report.r2Drops, report.r2StatusTimeouts);
+    server.send(200, "application/json", json);
+}
+
+void onWifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
+    static IPAddress lastIp;
+    if (event == ARDUINO_EVENT_WIFI_STA_GOT_IP) {
+        lastIp = IPAddress(info.got_ip.ip_info.ip.addr);
+        wifiUp = true;
+        Serial.printf("Wi-Fi connected, IP %s\n", lastIp.toString().c_str());
+    } else if ((event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED || event == ARDUINO_EVENT_WIFI_STA_LOST_IP) &&
+               wifiUp.exchange(false)) {
+        Serial.printf("Wi-Fi disconnected, last IP %s\n", lastIp.toString().c_str());
+    }
+}
+
+void wifiTask(void*) {
+    WiFi.onEvent(onWifiEvent);
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    while (!wifiUp.load()) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+
+    sntp_set_time_sync_notification_cb([](timeval*) {
+        if (!timeSynced.exchange(true)) {
+            Serial.println("NTP synced");
+        }
+    });
+    configTzTime(kKyivTimezone, "pool.ntp.org");
+    if (MDNS.begin(kHostname)) {
+        MDNS.addService("http", "tcp", 80);
+    } else {
+        Serial.println("mDNS failed to start");
+    }
+
+    WebServer server(80);
+    server.on("/status", HTTP_GET, [&server] { sendStatus(server); });
+    server.begin();
+    for (;;) {
+        if (wifiUp.load()) {
+            server.handleClient();
+        }
+        vTaskDelay(pdMS_TO_TICKS(20));
+    }
+}
 }  // namespace
 
 void setup() {
@@ -541,6 +659,11 @@ void setup() {
     if (!r2.allocate() || !watchPeers.allocate()) {
         advertisingRetry.failed(nowMs(), false);
         Serial.println("Could not allocate BLE queues or discovery task");
+    }
+    // WebServer can wait on a slow client. Keep that work off the BLE bridge loop.
+    statusReports = xQueueCreate(1, sizeof(StatusReport));
+    if (!statusReports || xTaskCreate(wifiTask, "Wi-Fi HTTP", 6144, nullptr, 1, nullptr) != pdPASS) {
+        Serial.println("Could not allocate Wi-Fi status queue or task");
     }
 }
 
@@ -563,13 +686,18 @@ void loop() {
             runTick(now, subscribed);
         }
         const auto& status = bridge.snapshot();
+        if (statusReports) {
+            const StatusReport report{status, watchPeers.subscribedHandles(), watchPeers.connects(),
+                                      watchPeers.disconnects(), r2.connects(), r2.drops(), bridge.statusTimeouts()};
+            xQueueOverwrite(statusReports, &report);
+        }
         char belt[4] = "-";
         if (status.beltState) {
             std::snprintf(belt, sizeof(belt), "%u", static_cast<unsigned>(*status.beltState));
         }
-        Serial.printf("Watch %s | R2 %s | belt %s | %.1f km/h | %d spm | %d steps\n",
+        Serial.printf("Watch %s | R2 %s | belt %s | %.1f km/h | %d spm | %d steps | Wi-Fi %s\n",
                       subscribed ? "on" : "off", r2Label(status.r2), belt,
-                      status.speedKmh, status.cadenceSpm, status.steps);
+                      status.speedKmh, status.cadenceSpm, status.steps, wifiUp.load() ? "up" : "down");
     }
     if (advertisingStarted) {
         r2.service();

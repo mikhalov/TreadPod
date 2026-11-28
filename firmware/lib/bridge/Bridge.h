@@ -23,6 +23,7 @@ public:
     void onPacket(TimeMs now, const uint8_t* packet, std::size_t size);
 
     const Snapshot& snapshot() const { return snapshot_; }
+    uint32_t statusTimeouts() const { return statusTimeouts_; }
     Measurement measurement() const;
 
 private:
@@ -34,6 +35,7 @@ private:
     std::optional<TimeMs> lastWatchSeen_;
     std::optional<TimeMs> idleSince_;
     TimeMs lastStatus_ = 0;
+    uint32_t statusTimeouts_ = 0;
     int lastNonZeroCadenceSpm_ = 0;
     bool ranOnThisConnection_ = false;
     bool releasedForWorkout_ = false;

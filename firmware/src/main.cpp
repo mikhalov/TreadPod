@@ -27,6 +27,7 @@ static_assert(CONFIG_BT_NIMBLE_ROLE_CENTRAL && CONFIG_BT_NIMBLE_ROLE_OBSERVER &&
 
 constexpr char kDeviceName[] = "TreadPod";
 constexpr uint32_t kScanTimeoutMs = 10000;
+constexpr TimeMs kConnectDeadlineMs = 15000;
 constexpr TimeMs kTickIntervalMs = 1000;
 
 TimeMs nowMs() { return static_cast<TimeMs>(esp_timer_get_time()) / 1000; }
@@ -59,11 +60,12 @@ private:
     struct Peer {
         uint16_t handle = BLE_HS_CONN_HANDLE_NONE;
         bool subscribed = false;
+        bool connectReported = false;
     };
 
     void onConnect(NimBLEServer*, NimBLEConnInfo& conn) override {
-        if (auto* peer = find(BLE_HS_CONN_HANDLE_NONE)) {
-            peer->handle = conn.getConnHandle();
+        if (auto* peer = registerPeer(conn.getConnHandle())) {
+            peer->connectReported = true;
             updateState();
         }
     }
@@ -76,10 +78,27 @@ private:
     }
 
     void onSubscribe(NimBLECharacteristic*, NimBLEConnInfo& conn, uint16_t value) override {
-        if (auto* peer = find(conn.getConnHandle())) {
-            peer->subscribed = (value & 1) != 0;
+        const bool subscribed = (value & 1) != 0;
+        const auto handle = conn.getConnHandle();
+        if (auto* peer = subscribed ? registerPeer(handle) : find(handle)) {
+            peer->subscribed = subscribed;
+            // GATT clears the CCCD on teardown even when GAP suppresses an early disconnect.
+            if (!subscribed && !peer->connectReported) {
+                *peer = Peer{};
+            }
             updateState();
         }
+    }
+
+    Peer* registerPeer(uint16_t handle) {
+        auto* peer = find(handle);
+        if (!peer) {
+            peer = find(BLE_HS_CONN_HANDLE_NONE);
+            if (peer) {
+                peer->handle = handle;
+            }
+        }
+        return peer;
     }
 
     Peer* find(uint16_t handle) {
@@ -215,12 +234,14 @@ public:
                 break;
             }
             case Stage::Connecting:
-                if (event == ConnectionEvent::Connected) {
+                if (event == ConnectionEvent::Ended) {
+                    fail("R2 connection failed");
+                } else if (nowMs() >= connectDeadline_) {
+                    fail("R2 connection timed out");
+                } else if (event == ConnectionEvent::Connected) {
                     stage_ = Stage::Discovering;
                     discoveryPending_ = true;
                     xTaskNotifyGive(discoveryTask_);
-                } else if (event == ConnectionEvent::Ended) {
-                    fail("R2 connection failed");
                 }
                 break;
             case Stage::Discovering:
@@ -324,12 +345,17 @@ private:
         if (attempt != link.closingAttempt_.load() || attempt == link.endedAttempt_) {
             return;
         }
-        // A connection can win the race with cancellation before onConnect is delivered.
         if (link.client_->isConnected()) {
             link.client_->disconnect();
-        } else if (link.client_->getConnHandle() == BLE_HS_CONN_HANDLE_NONE && attempt != link.cancelledAttempt_) {
-            link.cancelledAttempt_ = attempt;
-            link.client_->cancelConnect();
+        } else if (link.client_->getConnHandle() == BLE_HS_CONN_HANDLE_NONE) {
+            // GAP owns the link before the client receives its handle.
+            const auto peer = link.client_->getPeerAddress();
+            ble_gap_conn_desc conn;
+            if (ble_gap_conn_find_by_addr(peer.getBase(), &conn) == 0 && conn.role == BLE_GAP_ROLE_MASTER) {
+                ble_gap_terminate(conn.conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+            } else if (attempt != link.cancelledAttempt_ && ble_gap_conn_active() && link.client_->cancelConnect()) {
+                link.cancelledAttempt_ = attempt;
+            }
         }
     }
 
@@ -337,6 +363,7 @@ private:
         Serial.printf("R2 connecting to %s\n", candidate_.name);
         xQueueReset(packetQueue_);
         ++attempt_;
+        connectDeadline_ = nowMs() + kConnectDeadlineMs;
         if (!client_->connect(NimBLEAddress(candidate_.address), true, true, false)) {
             fail("R2 could not start connection");
             return;
@@ -417,6 +444,7 @@ private:
     ble_npl_event closeEvent_{};
     Stage stage_ = Stage::Idle;
     ScanResult scanResult_ = ScanResult::Pending;
+    TimeMs connectDeadline_ = 0;
     bool scanPending_ = false;
     bool attemptPending_ = false;
     bool discoveryPending_ = false;

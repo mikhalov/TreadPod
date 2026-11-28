@@ -614,15 +614,29 @@ void onWifiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
         lastIp = IPAddress(info.got_ip.ip_info.ip.addr);
         wifiUp = true;
         Serial.printf("Wi-Fi connected, IP %s\n", lastIp.toString().c_str());
-    } else if ((event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED || event == ARDUINO_EVENT_WIFI_STA_LOST_IP) &&
-               wifiUp.exchange(false)) {
-        Serial.printf("Wi-Fi disconnected, last IP %s\n", lastIp.toString().c_str());
+    } else if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
+        // Reason codes: 201 no AP found (wrong SSID or 5 GHz), 15/204 handshake failed (wrong password).
+        static uint8_t lastReason = 0;
+        const uint8_t reason = info.wifi_sta_disconnected.reason;
+        if (wifiUp.exchange(false) || reason != lastReason) {
+            Serial.printf("Wi-Fi disconnected, reason %u, last IP %s\n", reason, lastIp.toString().c_str());
+        }
+        lastReason = reason;
+    } else if (event == ARDUINO_EVENT_WIFI_STA_LOST_IP && wifiUp.exchange(false)) {
+        Serial.printf("Wi-Fi lost IP %s\n", lastIp.toString().c_str());
     }
 }
 
 void wifiTask(void*) {
     WiFi.onEvent(onWifiEvent);
     WiFi.mode(WIFI_STA);
+    const int found = WiFi.scanNetworks();
+    Serial.printf("Wi-Fi scan: %d networks (2.4 GHz only)\n", found);
+    for (int i = 0; i < found; ++i) {
+        Serial.printf("  %s%s rssi %d ch %d\n", WiFi.SSID(i).c_str(), WiFi.SSID(i) == WIFI_SSID ? " <- configured" : "",
+                      static_cast<int>(WiFi.RSSI(i)), static_cast<int>(WiFi.channel(i)));
+    }
+    WiFi.scanDelete();
     WiFi.setAutoReconnect(true);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 

@@ -101,7 +101,7 @@ If re-pairing ever gets annoying, here are the real ways out:
 
 | Option | Cost | Verdict |
 |---|---|---|
-| **ESP32-S3 board** running the whole bridge | ~300 UAH *(estimate, not checked)* | **Recommended:** static BLE address, no PC needed |
+| **ESP32 board** running the whole bridge ([firmware/](firmware/)) | ~300 UAH *(estimate, not checked)* | **Recommended:** static BLE address, no PC needed. In progress: test pod on an ESP-WROOM-32 paired with the PACE 4, pace followed, and the watch reconnected after a board reset without re-pairing (2026-11-28) |
 | Dedicated USB BLE dongle + Bumble stack | dongle | Works, but still requires the PC to stay on |
 | WSL2 + `usbipd` + BlueZ | free | Needs a custom WSL kernel; fragile |
 
